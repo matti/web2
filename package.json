@@ -1,0 +1,24 @@
+{
+  "name": "web2",
+  "version": "1.0.0",
+  "description": "Agent-first CLI browser automation tool — runs entirely in Docker. Also a Claude Code plugin.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:cli": "cd cmd/web2 && go build -o web2 .",
+    "test": "npx tsx --test 'src/tests/**/*.test.ts'",
+    "test:e2e": "./e2e/run.sh",
+    "test:docker": "./e2e/run.sh --docker"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "commander": "^13.1.0",
+    "linkedom": "^0.18.12",
+    "playwright": "^1.52.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

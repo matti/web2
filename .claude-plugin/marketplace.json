@@ -1,0 +1,13 @@
+{
+  "name": "web2-marketplace",
+  "owner": {
+    "name": "mpa"
+  },
+  "plugins": [
+    {
+      "name": "web2",
+      "source": "./",
+      "description": "Agent-first browser automation for Claude Code — isolated browser per agent; browse, read, screenshot, crawl, interact."
+    }
+  ]
+}

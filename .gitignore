@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+*.tmp
+
+# Build outputs (cmd/web2/_bundle.tar.gz IS tracked: go:embed needs it,
+# and maybeRebuild regenerates it on source changes in dev)
+cmd/web2/web2
+cmd/web2/web2-e2e-bin
+
+# Crawl / test artifacts
+crawl-output/
+www.*/
+*.png
+*.pdf
+*.mp4
