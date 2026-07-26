@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatCliError } from "./lib/errors.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Works from both src/ (tsx) and dist/src/ (compiled)
@@ -23,7 +24,7 @@ const program = new Command()
   });
 
 // grounded() wraps page-mutating commands: after the action succeeds, print
-// the grounding line (→ url — "title") so the caller always knows where the
+// the grounding line (→ url - "title") so the caller always knows where the
 // browser ended up without an extra command.
 async function grounded(fn: () => Promise<void>): Promise<void> {
   await fn();
@@ -450,4 +451,7 @@ recordCmd.command("save")
     await recordSave(opts);
   });
 
-program.parse();
+program.parseAsync().catch((err: unknown) => {
+  console.error(formatCliError(err));
+  process.exit(1);
+});

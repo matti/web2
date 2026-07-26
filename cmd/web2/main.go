@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// web2 — agent-first CLI browser automation.
+// web2 - agent-first CLI browser automation.
 //
 // Design (see web2.md): every caller lives in a world with exactly one
-// browser — its own. There is no session concept on this surface: identity
+// browser - its own. There is no session concept on this surface: identity
 // is derived from the environment (identity.go), the container starts
 // lazily, dies on idle/TTL, and nothing an agent can run touches another
 // owner's browser.
@@ -39,10 +39,15 @@ func main() {
 		os.Exit(0)
 	}
 
+	cmd, rest := args[0], args[1:]
+	if !isHostCommand(cmd) && !isContainerCommand(cmd) {
+		fmt.Fprintf(os.Stderr, "Error: unknown command %q. Run 'web2 --help' for usage.\n", cmd)
+		os.Exit(exitUsage)
+	}
+
 	// Lazy cleanup of provably-orphaned containers (best-effort, label-scoped).
 	reapOrphans()
 
-	cmd, rest := args[0], args[1:]
 	switch cmd {
 	case "status":
 		cmdStatus(rest)
@@ -60,6 +65,45 @@ func main() {
 		// All browser commands delegate to the container.
 		cmdExec(cmd, rest)
 	}
+}
+
+func isHostCommand(name string) bool {
+	switch name {
+	case "status", "reset", "open", "doctor", "admin", "help", "-h", "--help":
+		return true
+	default:
+		return false
+	}
+}
+
+func containerCommands() []string {
+	return []string{
+		"cookies",
+		"crawl",
+		"do",
+		"exec",
+		"extract",
+		"go",
+		"network",
+		"normalize",
+		"page",
+		"pdf",
+		"record",
+		"reload",
+		"status",
+		"tab",
+		"viewport",
+		"wait",
+	}
+}
+
+func isContainerCommand(name string) bool {
+	for _, command := range containerCommands() {
+		if name == command {
+			return true
+		}
+	}
+	return false
 }
 
 func usage() {
@@ -117,7 +161,7 @@ Cookies:
   cookies list [--json]           List cookies
   cookies clear                   Clear all cookies
 
-Record (dashcam always on — rolling 5min buffer):
+Record (dashcam always on - rolling 5min buffer):
   record save [--output FILE]     Save current dashcam buffer to file
   record stop                     Stop recording and save the video
   record start [--output FILE]    Start a full recording (replaces dashcam)

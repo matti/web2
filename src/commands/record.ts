@@ -19,6 +19,42 @@ function resolveOutput(output: string): string {
   return path.resolve(process.cwd(), output);
 }
 
+function stopRecording(pid: number): void {
+  // A malformed stale pid must never signal the CLI's own process group
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return;
+  }
+
+  // Send SIGINT to ffmpeg so it finalizes any files it is writing
+  try {
+    process.kill(pid, "SIGINT");
+  } catch {
+    // A stale pid file should not prevent starting a new recorder
+    return;
+  }
+
+  // Poll for exit so a replacement cannot write to the same files too early
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      break; // process exited
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  }
+}
+
+function cleanDashcamBuffer(): void {
+  // Old segments must not leak into a later save from the replacement recorder
+  const segments = readdirSync(STATE_DIR)
+    .filter((f) => f.startsWith(".web-record") && f.endsWith(".ts"));
+  for (const segment of segments) {
+    try { unlinkSync(`${STATE_DIR}/${segment}`); } catch { /* best-effort cleanup */ }
+  }
+  try { unlinkSync(HLS_PLAYLIST); } catch { /* best-effort cleanup */ }
+}
+
 export function recordStart(opts: { output?: string }): void {
   if (existsSync(PID_FILE)) {
     process.stderr.write("Error: recording already in progress\n");
@@ -75,23 +111,7 @@ export function recordStop(): void {
   }
   const output = resolveOutput(config.output);
 
-  // Send SIGINT to ffmpeg so it finalizes the file
-  try {
-    process.kill(pid, "SIGINT");
-  } catch {
-    // process may already be dead
-  }
-
-  // Poll for exit (max 3s, 100ms intervals)
-  const deadline = Date.now() + 3000;
-  while (Date.now() < deadline) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      break; // process exited
-    }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
-  }
+  stopRecording(pid);
 
   if (config.mode === "record") {
     copyFileSync(TEMP_VIDEO, output);
@@ -143,9 +163,17 @@ export function recordDashcam(opts: {
   seconds?: number;
 }): void {
   if (existsSync(PID_FILE)) {
-    process.stderr.write("Error: recording already in progress\n");
-    process.exit(1);
+    try {
+      const pid = Number(readFileSync(PID_FILE, "utf-8").trim());
+      stopRecording(pid);
+    } catch {
+      // An unreadable stale pid file should not prevent the replacement
+    }
   }
+
+  cleanDashcamBuffer();
+  try { unlinkSync(PID_FILE); } catch { /* best-effort cleanup */ }
+  try { unlinkSync(CONFIG_FILE); } catch { /* best-effort cleanup */ }
 
   const output = opts.output ?? "dashcam.mp4";
   const seconds = opts.seconds ?? 60;
@@ -204,7 +232,7 @@ export function recordSave(opts: { output?: string }): void {
 
   if (config.mode !== "dashcam") {
     process.stderr.write(
-      "Error: save only works with dashcam mode — use 'record stop' for normal recordings\n",
+      "Error: save only works with dashcam mode - use 'record stop' for normal recordings\n",
     );
     process.exit(1);
   }
@@ -221,7 +249,7 @@ export function recordSave(opts: { output?: string }): void {
     });
 
   if (segments.length === 0) {
-    process.stderr.write("No segments yet — recording may have just started\n");
+    process.stderr.write("No segments yet - recording may have just started\n");
     process.exit(1);
   }
 

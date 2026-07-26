@@ -131,3 +131,36 @@ describe("record HLS segment sort order", () => {
     );
   });
 });
+
+// `web2 record dashcam --seconds N` is documented as "Restart dashcam with
+// custom buffer size", and the dashcam is always running by design. Bailing
+// out when a recording exists therefore made the command impossible to run:
+// every invocation hit "Error: recording already in progress". Restarting is
+// the whole point, so it must replace the running recorder instead.
+describe("record dashcam restarts instead of refusing", () => {
+  function dashcamBody(): string {
+    const startIdx = src.indexOf("function recordDashcam");
+    assert.ok(startIdx >= 0, "recordDashcam not found in record.ts");
+    const nextExport = src.indexOf("\nexport ", startIdx + 1);
+    return src.substring(startIdx, nextExport > 0 ? nextExport : undefined);
+  }
+
+  it("does not abort when a recording is already running", () => {
+    assert.ok(
+      !/already in progress/.test(dashcamBody()),
+      "recordDashcam refuses while a recording runs, but the dashcam always runs",
+    );
+  });
+
+  it("terminates the running recorder before starting the new one", () => {
+    const body = dashcamBody();
+    assert.ok(
+      /PID_FILE/.test(body),
+      "recordDashcam must notice an existing recorder via the pid file",
+    );
+    assert.ok(
+      /kill|recordStop|stopRecording/.test(body),
+      "recordDashcam must stop the running recorder before replacing it",
+    );
+  });
+});
