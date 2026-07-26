@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { withPage } from "../lib/browser.js";
 import { STATE_DIR } from "../lib/state.js";
+import { normalizeNavigationUrl } from "../lib/url.js";
 
 const NETWORK_LOG = `${STATE_DIR}/web-network.json`;
 
@@ -20,10 +21,7 @@ interface Redirect {
 }
 
 export async function navigate(url: string, opts: { wait?: string }): Promise<void> {
-  // Auto-prepend http:// for bare domains like "example.com"
-  if (!/^https?:\/\//i.test(url)) {
-    url = `http://${url}`;
-  }
+  url = normalizeNavigationUrl(url);
 
   await withPage(async (page) => {
     const waitMap: Record<string, "commit" | "domcontentloaded" | "networkidle"> = {

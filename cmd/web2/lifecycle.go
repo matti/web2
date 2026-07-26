@@ -49,8 +49,7 @@ func checkSessionCap() {
 
 func startContainer(o Owner, ctr string) {
 	// Build image if needed
-	out, _ := dockerOutputSilent("image", "inspect", image)
-	if strings.TrimSpace(out) == "" {
+	if !imageExists(image) {
 		dbg("start: image not found, building")
 		fmt.Fprintln(os.Stderr, "Building web2 Docker image (first run)...")
 		if err := buildImage(); err != nil {

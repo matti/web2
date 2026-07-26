@@ -6,12 +6,27 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 // containerRunning checks if a container with the given name is running.
 func containerRunning(name string) bool {
 	out, err := dockerOutputSilent("ps", "-q", "--filter", fmt.Sprintf("name=^%s$", name))
+	return err == nil && strings.TrimSpace(out) != ""
+}
+
+// dockerProbe is the seam tests swap to drive the docker helpers below.
+var dockerProbe = dockerOutputSilent
+
+// imageExists reports whether a local image with the given ref exists.
+//
+// The exit status is the signal, not stdout: `docker image inspect` prints
+// "[]" to stdout and exits non-zero when the image is missing, so a non-empty
+// stdout is not proof of existence. --format keeps stdout empty in that case
+// too, and reduces a hit to a bare image ID.
+func imageExists(ref string) bool {
+	out, err := dockerProbe("image", "inspect", "--format", "{{.Id}}", ref)
 	return err == nil && strings.TrimSpace(out) != ""
 }
 
@@ -99,7 +114,7 @@ func dockerExecCtx(ctx context.Context, container string, cmdArgs []string, rewr
 
 // containerWorkdir picks the exec working directory. Only $HOME is
 // bind-mounted into the container, so a host cwd outside home does not
-// exist there — fall back to $HOME (relative --output paths outside home
+// exist there: fall back to $HOME (relative --output paths outside home
 // are bridged by the rewrite machinery regardless).
 func containerWorkdir() string {
 	cwd, err := os.Getwd()
@@ -107,8 +122,32 @@ func containerWorkdir() string {
 	if err != nil || home == "" {
 		return "/"
 	}
-	if cwd == home || strings.HasPrefix(cwd, home+string(os.PathSeparator)) {
-		return cwd
+	return workdirUnderHome(cwd, home, filepath.EvalSymlinks)
+}
+
+// workdirUnderHome decides on the PHYSICAL path, because that is what the
+// container sees under the $HOME mount. os.Getwd honors $PWD and so hands
+// back the logical path, and a logical path like $HOME/dev may be a symlink
+// pointing clean out of home (e.g. to /Users/Shared/dev). Such a path passes
+// a plain prefix test yet does not exist in the container, and docker exec
+// fails with `chdir to cwd ... no such file or directory`.
+//
+// The answer is phrased with the literal home prefix rather than its resolved
+// form, since the bind mount uses the literal path on both sides.
+func workdirUnderHome(cwd, home string, resolve func(string) (string, error)) string {
+	realCwd, err := resolve(cwd)
+	if err != nil {
+		return home
+	}
+	realHome, err := resolve(home)
+	if err != nil {
+		realHome = home
+	}
+	if realCwd == realHome {
+		return home
+	}
+	if suffix := strings.TrimPrefix(realCwd, realHome+string(os.PathSeparator)); suffix != realCwd {
+		return home + string(os.PathSeparator) + suffix
 	}
 	return home
 }

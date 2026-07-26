@@ -35,11 +35,10 @@ func cmdDoctor(args []string) {
 		fmt.Println("  Docker daemon: running")
 	}
 
-	out, _ := dockerOutputSilent("image", "inspect", image)
-	if strings.TrimSpace(out) == "" {
-		fmt.Printf("  Image %s: not built (builds automatically on first command)\n", image)
-	} else {
+	if imageExists(image) {
 		fmt.Printf("  Image %s: found\n", image)
+	} else {
+		fmt.Printf("  Image %s: not built (builds automatically on first command)\n", image)
 	}
 
 	if ok {

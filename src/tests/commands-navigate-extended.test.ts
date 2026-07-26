@@ -2,39 +2,63 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeNavigationUrl } from "../lib/url.js";
 
 const navSrc = readFileSync(join(import.meta.dirname, "../commands/navigate.ts"), "utf-8");
 
+// This block used to re-declare the normalization inline, so it mirrored
+// whatever the implementation did and could never fail. It imports the real
+// function now.
 describe("navigate URL normalization", () => {
-  function normalizeUrl(url: string): string {
-    if (!/^https?:\/\//i.test(url)) return `http://${url}`;
-    return url;
-  }
-
   it("prepends http:// for bare domains", () => {
-    assert.equal(normalizeUrl("example.com"), "http://example.com");
-    assert.equal(normalizeUrl("example.com/path"), "http://example.com/path");
+    assert.equal(normalizeNavigationUrl("example.com"), "http://example.com");
+    assert.equal(normalizeNavigationUrl("example.com/path"), "http://example.com/path");
   });
 
   it("preserves http:// URLs", () => {
-    assert.equal(normalizeUrl("http://example.com"), "http://example.com");
+    assert.equal(normalizeNavigationUrl("http://example.com"), "http://example.com");
   });
 
   it("preserves https:// URLs", () => {
-    assert.equal(normalizeUrl("https://example.com"), "https://example.com");
+    assert.equal(normalizeNavigationUrl("https://example.com"), "https://example.com");
   });
 
   it("is case-insensitive for protocol", () => {
-    assert.equal(normalizeUrl("HTTP://example.com"), "HTTP://example.com");
-    assert.equal(normalizeUrl("HTTPS://example.com"), "HTTPS://example.com");
+    assert.equal(normalizeNavigationUrl("HTTP://example.com"), "HTTP://example.com");
+    assert.equal(normalizeNavigationUrl("HTTPS://example.com"), "HTTPS://example.com");
   });
 
   it("handles localhost", () => {
-    assert.equal(normalizeUrl("localhost:3000"), "http://localhost:3000");
+    assert.equal(normalizeNavigationUrl("localhost:3000"), "http://localhost:3000");
   });
 
   it("handles IP addresses", () => {
-    assert.equal(normalizeUrl("192.168.1.1:8080"), "http://192.168.1.1:8080");
+    assert.equal(normalizeNavigationUrl("192.168.1.1:8080"), "http://192.168.1.1:8080");
+  });
+
+  // Regression: the check only recognized http/https, so every other scheme
+  // got an http:// prefix glued on. `file:///tmp/x.html` became
+  // `http://file///tmp/x.html` and died with ERR_NAME_NOT_RESOLVED.
+  it("preserves file:// URLs", () => {
+    assert.equal(
+      normalizeNavigationUrl("file:///Users/x/page.html"),
+      "file:///Users/x/page.html",
+    );
+  });
+
+  it("preserves schemes that carry no authority", () => {
+    assert.equal(normalizeNavigationUrl("about:blank"), "about:blank");
+    assert.equal(normalizeNavigationUrl("data:text/html,<h1>hi</h1>"), "data:text/html,<h1>hi</h1>");
+  });
+
+  it("preserves other explicit schemes", () => {
+    assert.equal(normalizeNavigationUrl("ws://localhost:9222"), "ws://localhost:9222");
+    assert.equal(normalizeNavigationUrl("FILE:///tmp/x"), "FILE:///tmp/x");
+  });
+
+  // A host:port pair looks like a scheme to a naive regex; it must not.
+  it("still prefixes host:port that resembles a scheme", () => {
+    assert.equal(normalizeNavigationUrl("myhost:8080/path"), "http://myhost:8080/path");
   });
 });
 
