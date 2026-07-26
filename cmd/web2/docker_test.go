@@ -105,6 +105,19 @@ func readRepoFile(t *testing.T, rel string) string {
 	return string(b)
 }
 
+// Claude Code and Codex read .claude-plugin/plugin.json; Antigravity (agy)
+// looks for plugin.json in the plugin root and refuses to install without it.
+// A root symlink satisfies both without a second copy of the metadata to keep
+// in sync. Deleting it breaks `agy plugin install` with no other signal.
+func TestRootPluginJSONResolves(t *testing.T) {
+	root := readRepoFile(t, "plugin.json")
+	canonical := readRepoFile(t, ".claude-plugin/plugin.json")
+	if root != canonical {
+		t.Error("plugin.json in the repo root does not resolve to .claude-plugin/plugin.json; " +
+			"agy needs it there, and a copy would drift")
+	}
+}
+
 // Only $HOME is bind-mounted, and the container sees its PHYSICAL contents.
 // A logical cwd therefore has to be resolved before it is judged: $HOME/dev
 // can be a symlink to /Users/Shared/dev, which passes a plain string prefix
