@@ -22,7 +22,7 @@ func cmdExec(cmd string, args []string) {
 
 	cmdArgs := append([]string{cmd}, args...)
 
-	// page tail is long-running — reconnect if the container goes away
+	// page tail is long-running - reconnect if the container goes away
 	// (e.g. idle-killed while the viewer was open).
 	if isReconnectable(cmd, args) {
 		execWithReconnect(owner, cmdArgs)
@@ -62,7 +62,7 @@ func cmdExec(cmd string, args []string) {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			if exitErr.ExitCode() == exitBusy {
-				fmt.Fprintln(os.Stderr, "Error: browser busy — another command is running (waited 30s); retry shortly")
+				fmt.Fprintln(os.Stderr, busyWaitErrorMessage())
 				os.Exit(exitBusy)
 			}
 			os.Exit(exitErr.ExitCode())
@@ -70,6 +70,14 @@ func cmdExec(cmd string, args []string) {
 		os.Exit(exitCommand)
 	}
 	dbg("exec: done")
+}
+
+func busyWaitErrorMessage() string {
+	lockWait, err := resolveLockWait()
+	if err != nil {
+		lockWait = defaultLockWait
+	}
+	return fmt.Sprintf("Error: browser busy - another command is running (waited %ds); retry shortly", lockWait)
 }
 
 // commandContext returns the per-command timeout context. Long-running

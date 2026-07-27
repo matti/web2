@@ -1,9 +1,9 @@
 # web2
 
-Agent-first CLI browser automation. Everything runs inside Docker — the host
+Agent-first CLI browser automation. Everything runs inside Docker - the host
 needs only Docker and the `web2` binary.
 
-**The core promise: every caller gets exactly one browser — its own.** There
+**The core promise: every caller gets exactly one browser - its own.** There
 is nothing to set up, nothing to remember, and nothing you can break for
 anyone else:
 
@@ -30,7 +30,7 @@ web2 open novnc                     # watch it live
 ```
 
 Every page-changing command ends with a grounding line on stderr
-(`→ <url> — "Title"`), errors are one line and actionable, and every command
+(`→ <url> - "Title"`), errors are one line and actionable, and every command
 supports machine-readable output where it matters.
 
 ## Install
@@ -43,7 +43,7 @@ ln -s "$(pwd)/web2" /usr/local/bin/web2   # or any directory on your PATH
 web2 doctor                               # checks Docker; image builds on first use
 ```
 
-**2. Install the Claude Code plugin** — run these inside any Claude Code
+**2. Install the Claude Code plugin** - run these inside any Claude Code
 session:
 
 ```
@@ -53,7 +53,7 @@ session:
 
 That's it. The skills are now available in every session as `/web2:go`,
 `/web2:read`, `/web2:crawl` and `/web2:screenshot`, and agents can use the
-`web2` CLI directly. Updates flow straight from the directory — no
+`web2` CLI directly. Updates flow straight from the directory - no
 reinstall needed.
 
 Alternative without the plugin system: copy `skills/*` into
@@ -69,6 +69,17 @@ lazily ensures the container, serializes concurrent commands with a lock, and
 enforces timeouts, resource limits and a host-wide browser cap.
 
 Design document: [web2.md](./web2.md). Contributor guide: [CLAUDE.md](./CLAUDE.md).
+
+## Environment
+
+`WEB2_DEBUG`, `WEB2_NO_REBUILD`, `WEB2_SESSION`, and other `WEB2_*` variables are honored as documented in [CLAUDE.md](./CLAUDE.md).
+
+Additional host lock tuning:
+
+`WEB2_LOCK_WAIT` (seconds). Set this to change how long concurrent
+`web2` commands wait for the in-container lock before returning the busy exit
+code. The value is forwarded as `WEB_LOCK_WAIT` inside the container and must be
+a non-negative integer.
 
 ## v1 coexistence
 

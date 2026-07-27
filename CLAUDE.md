@@ -3,9 +3,9 @@
 ## Purpose
 
 web2 is an **agent-first** CLI browser automation tool. Everything runs inside
-Docker — the user needs nothing on the host except Docker and the `web2`
+Docker - the user needs nothing on the host except Docker and the `web2`
 binary. The core design promise: **every caller lives in a world with exactly
-one browser — its own.** There is no session concept on the agent surface;
+one browser - its own.** There is no session concept on the agent surface;
 identity is derived automatically from the environment, the container starts
 lazily on the first command, and dies by itself on idle/TTL. Nothing an agent
 can run touches another owner's browser. Full design rationale and spec:
@@ -43,11 +43,11 @@ Inside the container v1's `WEB_*` names are kept so `src/` stays portable.
   never mention other browsers. `web2 admin` is the only cross-owner surface
   and refuses to run when `CLAUDECODE`/`AI_AGENT` is set unless `WEB2_ADMIN=1`.
 - **Nothing may depend on caller memory.** Every Bash call from an agent runs
-  in a fresh shell with a fresh PID — identity must come from stable signals.
+  in a fresh shell with a fresh PID - identity must come from stable signals.
 - **Exit codes:** 0 ok · 1 command failed · 2 usage · 3 infra · 4 timeout ·
   5 busy (lock). No others.
 - **Output contract:** data → stdout, meta → stderr. Page-mutating commands
-  end with a grounding line on stderr: `→ <url> — "<title>"`.
+  end with a grounding line on stderr: `→ <url> - "<title>"`.
 - **Reaper rules:** exited containers always removed; running `proc`-kind
   owners removed only on pid+starttime mismatch; uuid-kind owners are NEVER
   reaped from the host (idle/TTL handles them).
@@ -68,7 +68,15 @@ Dev mode: running inside this repo mounts `src/` into the container (tsx, no
 image rebuild needed) and auto-rebuilds the Go binary when sources change
 (`WEB2_NO_REBUILD=1` disables).
 
-## Testing — TDD required (NON-NEGOTIABLE)
+Host env variables:
+
+- `WEB2_DEBUG=1` enables timestamped debug logs in host and container.
+- `WEB2_LOCK_WAIT=<seconds>` sets container lock wait timeout before busy exit
+  5. Value must be a non-negative integer. The host maps this to
+  `WEB_LOCK_WAIT` for in-container consumption.
+- `WEB2_NO_REBUILD=1` disables dev-mode Go rebuilds.
+
+## Testing - TDD required (NON-NEGOTIABLE)
 
 **Every change must include a test, written BEFORE the implementation
 (red-green-refactor).** Bug fix → failing repro test first.
@@ -89,23 +97,23 @@ npm test                # TS unit tests (< 3s)
 - Fast e2e group < 15s. E2e uses compiled JS (`node dist/`), not tsx.
 - New e2e scripts must be independent (own Chromium, parallel).
 
-### Regression guards (cmd/web2/main_test.go — keep passing)
+### Regression guards (cmd/web2/main_test.go - keep passing)
 
 - `web2 --help` and usage() must never contain the word "session".
 - Banned strings in host source: `web-default`, `web2-default`,
   `Multiple sessions`.
 - Host binary must not read any bare `WEB_*` env var.
 
-## Gotchas (learned the hard way — do not reintroduce)
+## Gotchas (learned the hard way - do not reintroduce)
 
 - `docker ps --format` needs `{{.Label "x"}}`; `{{index .Labels "x"}}` only
   works in `docker inspect` (ps .Labels is a string).
 - `/dev/null` IS a char device: a naive isTerminal() passes `-t` to docker
   exec and dies with "the input device is not a TTY" when output is
   redirected. See isTerminal in docker.go.
-- With extensions loaded, `browser.contexts()` ordering is nondeterministic —
+- With extensions loaded, `browser.contexts()` ordering is nondeterministic -
   never assume `contexts[0]` owns the pages (see withPage / tab.ts).
-- Never `page.close()` a page withPage created — first-command state would
+- Never `page.close()` a page withPage created - first-command state would
   vanish (the initial about:blank target may attach late after startup).
 - The exec command JSON-stringifies results: `exec "'a'"` prints `"a"`.
 - CDP cookie limitation: `context.cookies()` is empty over connectOverCDP;

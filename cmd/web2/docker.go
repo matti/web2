@@ -7,7 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+)
+
+const (
+	defaultLockWait = 30
 )
 
 // containerRunning checks if a container with the given name is running.
@@ -73,7 +78,7 @@ func dockerExec(container string, cmdArgs []string) error {
 //     in-container command lock.
 //
 // Host-facing env is WEB2_*; the container keeps v1's WEB_* names so the
-// in-container code stays byte-identical — the mapping happens here.
+// in-container code stays byte-identical - the mapping happens here.
 func dockerExecCtx(ctx context.Context, container string, cmdArgs []string, rewrites []outputRewrite, noLock bool) error {
 	args := []string{"exec"}
 	if isTerminal(os.Stdin) {
@@ -94,6 +99,17 @@ func dockerExecCtx(ctx context.Context, container string, cmdArgs []string, rewr
 	if v := os.Getenv("WEB2_TAB_ID"); v != "" {
 		args = append(args, "-e", "WEB_TAB_ID="+v)
 	}
+	// WEB2_LOCK_WAIT controls how long flock waits before returning busy.
+	// Reject bad values early so callers get a usage error instead of a
+	// hard-to-debug flock failure.
+	lockWait, err := resolveLockWait()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: WEB2_LOCK_WAIT must be a non-negative integer: %v\n", err)
+		os.Exit(exitUsage)
+	}
+	if _, ok := os.LookupEnv("WEB2_LOCK_WAIT"); ok {
+		args = append(args, "-e", "WEB_LOCK_WAIT="+strconv.Itoa(lockWait))
+	}
 	if noLock {
 		args = append(args, "-e", "WEB_NO_LOCK=1")
 	}
@@ -110,6 +126,28 @@ func dockerExecCtx(ctx context.Context, container string, cmdArgs []string, rewr
 	}
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
+}
+
+func resolveLockWait() (int, error) {
+	if v, ok := os.LookupEnv("WEB2_LOCK_WAIT"); ok {
+		if err := validateLockWait(v); err != nil {
+			return 0, err
+		}
+		n, _ := strconv.Atoi(v)
+		return n, nil
+	}
+	return defaultLockWait, nil
+}
+
+func validateLockWait(v string) error {
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("value must be zero or greater")
+	}
+	return nil
 }
 
 // containerWorkdir picks the exec working directory. Only $HOME is
@@ -153,7 +191,7 @@ func workdirUnderHome(cwd, home string, resolve func(string) (string, error)) st
 }
 
 // isTerminal checks if a file descriptor is a terminal. /dev/null is a
-// character device but NOT a terminal — treating it as one made the binary
+// character device but NOT a terminal - treating it as one made the binary
 // pass -i/-t to docker exec, which then died with "the input device is not
 // a TTY" whenever a command ran with output redirected to /dev/null.
 func isTerminal(f *os.File) bool {

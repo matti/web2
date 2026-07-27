@@ -41,7 +41,7 @@ remove_test_containers 2>/dev/null || true
 
 ctr_of() { docker ps -q --filter "label=web2.owner.key=cc:$1" | head -1; }
 
-# --- T2: memorylessness — 3 separate processes, same browser, state persists
+# --- T2: memorylessness - 3 separate processes, same browser, state persists
 "${A[@]}" exec "globalThis.x = 42" >/dev/null 2>&1
 out=$("${A[@]}" exec "globalThis.x" 2>/dev/null)
 [ "$out" = "42" ] && ok "T2 same browser across processes (x=$out)" || bad "T2 expected 42, got '$out'"
@@ -50,7 +50,7 @@ ctrA1=$(ctr_of web2-e2e-A)
 ctrA2=$(ctr_of web2-e2e-A)
 [ -n "$ctrA1" ] && [ "$ctrA1" = "$ctrA2" ] && ok "T2 container reused" || bad "T2 container changed: $ctrA1 vs $ctrA2"
 
-# --- T1: isolation — B gets its own browser, cannot see A's state
+# --- T1: isolation - B gets its own browser, cannot see A's state
 "${A[@]}" exec "globalThis.secret = 'AAA'" >/dev/null 2>&1
 outB=$("${B[@]}" exec "globalThis.secret" 2>/dev/null)
 [ "$outB" != "AAA" ] && ok "T1 B cannot see A's page state (got '$outB')" || bad "T1 B saw A's secret"
@@ -74,15 +74,15 @@ statOut=$("${A[@]}" status 2>&1)
 echo "$statOut" | grep -q "uptime:" && ok "T11 status shows uptime" || bad "T11 status missing uptime: $statOut"
 
 # --- T3: idle-kill + revive with restart note. One revive command with the
-# streams captured separately — a second command would race the (tiny) idle
+# streams captured separately - a second command would race the (tiny) idle
 # window.
 C=(env "${BASE_ENV[@]}" WEB2_IDLE_TIMEOUT=3 CLAUDE_CODE_SESSION_ID=web2-e2e-C "$BIN")
 "${C[@]}" exec "1" >/dev/null 2>&1
 ctrC=$(ctr_of web2-e2e-C)
 [ -n "$ctrC" ] || bad "T3 no container created"
-for i in $(seq 1 15); do
+for i in $(seq 1 60); do
   [ -z "$(ctr_of web2-e2e-C)" ] && break
-  sleep 2
+  sleep 0.5
 done
 [ -z "$(ctr_of web2-e2e-C)" ] && ok "T3 idle watchdog killed the browser" || bad "T3 browser survived idle timeout"
 ERR_C=$(mktemp)
@@ -106,17 +106,51 @@ capCode=$?
 echo "$capOut" | grep -q "too many browsers" && ok "T10 cap message" || bad "T10 message: $capOut"
 [ -n "$(ctr_of web2-e2e-A)" ] && ok "T10 existing browser not evicted" || bad "T10 A was evicted"
 
-# --- T6: lock — parallel command gets busy error (exit 5) after 30s wait
+# --- T6: lock - parallel command gets busy error (exit 5) once the wait runs
+# out. The wait is shortened here on purpose: proving the busy path is about
+# the exit code and the message, not about sitting through the production
+# 30s timeout, which used to be a third of this whole suite.
 HOLDER_LOG=$(mktemp)
 "${A[@]}" exec "new Promise(r => setTimeout(r, 50000)).then(() => 'holder-done')" > "$HOLDER_LOG" 2>&1 &
 HOLDER=$!
-sleep 4
-busyOut=$("${A[@]}" exec "1" 2>&1)
+sleep 3
+busyOut=$(env "${BASE_ENV[@]}" WEB2_LOCK_WAIT=3 CLAUDE_CODE_SESSION_ID=web2-e2e-A "$BIN" exec "1" 2>&1)
 busyCode=$?
 { kill "$HOLDER"; wait "$HOLDER"; } 2>/dev/null
 [ "$busyCode" = "5" ] && ok "T6 busy exit code 5" || bad "T6 exit=$busyCode out=$busyOut holder=$(cat "$HOLDER_LOG")"
 echo "$busyOut" | grep -q "browser busy" && ok "T6 busy message" || bad "T6 message: $busyOut"
 rm -f "$HOLDER_LOG"
+
+# --- T12: a finished command must leave the lock free. The heartbeat
+# refresher inherited flock's descriptor and kept the lock for its whole
+# sleep interval, so every follow-up command from the same owner queued
+# behind a command that had already exited: ~15s of dead wait on each.
+# Measured end to end on purpose. Asserting that one named lock file is
+# unlocked proved worthless: a broken fix locked a DIFFERENT file (flock's
+# fd form takes no command, so `flock ... 9 cmd` locks a file called "9")
+# and the file-specific check passed while every command still queued.
+# Start from a fresh browser: T6 leaves its 50s holder running INSIDE the
+# container (killing the host process does not stop the in-container command),
+# and that holder would be measured here as a queue it is not responsible for.
+"${A[@]}" reset >/dev/null 2>&1
+"${A[@]}" exec "1" >/dev/null 2>&1
+slow=0
+for i in 1 2 3; do
+  t0=$(date +%s)
+  "${A[@]}" exec "1" >/dev/null 2>&1
+  elapsed=$(( $(date +%s) - t0 ))
+  [ "$elapsed" -ge 8 ] && slow=$((slow + 1))
+  say "T12 follow-up $i took ${elapsed}s"
+done
+[ "$slow" -eq 0 ] && ok "T12 back-to-back commands are not queued" \
+  || bad "T12 $slow of 3 follow-ups waited 8s or more"
+
+# No descendant of a finished command may keep ANY flock: that is what makes
+# the next command wait, whichever file the lock happens to live on.
+ctrA=$(ctr_of web2-e2e-A)
+held=$(docker exec "$ctrA" sh -c 'grep -c FLOCK /proc/locks' 2>/dev/null | tr -d '\r')
+[ "${held:-1}" = "0" ] && ok "T12 no flock held after the command exits" \
+  || bad "T12 $held flock(s) still held after the command exited"
 
 echo ""
 echo "docker tests: $PASS passed, $FAIL failed"

@@ -54,6 +54,14 @@ func TestImageExists(t *testing.T) {
 	}
 }
 
+func TestBusyWaitErrorMessageUsesConfiguredWait(t *testing.T) {
+	t.Setenv("WEB2_LOCK_WAIT", "47")
+	want := "Error: browser busy - another command is running (waited 47s); retry shortly"
+	if got := busyWaitErrorMessage(); got != want {
+		t.Fatalf("busy wait message = %q, want %q", got, want)
+	}
+}
+
 // The playwright base image ships exactly the browser build that its own
 // release pins. When the lockfile resolves a DIFFERENT playwright version,
 // the first thing `npx playwright install chromium` does is delete the
