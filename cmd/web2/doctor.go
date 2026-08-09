@@ -41,6 +41,8 @@ func cmdDoctor(args []string) {
 		fmt.Printf("  Image %s: not built (builds automatically on first command)\n", image)
 	}
 
+	reportCapacity()
+
 	if ok {
 		fmt.Println("All good!")
 	} else {
@@ -49,8 +51,36 @@ func cmdDoctor(args []string) {
 	}
 }
 
+// reportCapacity shows the limit that decides whether another browser may
+// start. Since capacity became memory-based it is no longer a fixed number a
+// user can look up, so doctor is where it becomes visible.
+//
+// Deliberately prints no browser count: how many browsers exist, and whose
+// they are, is not the agent surface's business (web2.md P0). Free memory is
+// a property of the machine and says nothing about who else is running.
+func reportCapacity() {
+	total, available, ok := probeMemoryMB()
+	if !ok {
+		fmt.Println("  Docker VM memory: unknown (needs the image or a running browser)")
+		return
+	}
+	fmt.Printf("  Docker VM memory: %d of %d MB available\n", available, total)
+
+	minFree := envInt("WEB2_MIN_FREE_MB", defaultMinFreeMB)
+	if minFree <= 0 {
+		fmt.Printf("  Browser capacity: check disabled (WEB2_MIN_FREE_MB=%d)\n", minFree)
+		return
+	}
+	slots := estimateBrowserSlots(available, minFree, typicalBrowserMB)
+	fmt.Printf("  Browser capacity: room for ~%d more (~%d MB each, refuses below %d MB free)\n",
+		slots, typicalBrowserMB, minFree)
+	if slots == 0 {
+		fmt.Println("    Free capacity in Docker or raise its memory limit before starting one.")
+	}
+}
+
 // cmdOpen opens a viewer into the caller's OWN browser (starting it if
-// needed) — never anyone else's.
+// needed) - never anyone else's.
 func cmdOpen(args []string) {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
 		fmt.Fprint(os.Stderr, `Usage: web2 open <command>

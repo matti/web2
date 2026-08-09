@@ -20,7 +20,11 @@ check() { # check <desc> <expr...>
 
 # Fake agent identities. WEB2_PROJECT_ROOT points away from the repo so dev
 # mounts are off and commands use the compiled JS baked into the image.
-BASE_ENV=(WEB2_NO_REBUILD=1 WEB2_PROJECT_ROOT=/nonexistent WEB2_DEBUG=)
+# WEB2_MIN_FREE_MB=0 disables the capacity check for the suite's own browsers:
+# these tests exercise web2's logic, not the machine's spare memory, and a
+# busy Docker VM would otherwise fail them at random. T10 sets its own value
+# to test the check itself.
+BASE_ENV=(WEB2_NO_REBUILD=1 WEB2_PROJECT_ROOT=/nonexistent WEB2_DEBUG= WEB2_MIN_FREE_MB=0)
 A=(env "${BASE_ENV[@]}" CLAUDE_CODE_SESSION_ID=web2-e2e-A "$BIN")
 B=(env "${BASE_ENV[@]}" CLAUDE_CODE_SESSION_ID=web2-e2e-B "$BIN")
 
@@ -109,6 +113,14 @@ capCode=$?
 echo "$capOut" | grep -q "not enough memory" && ok "T10 capacity message" || bad "T10 message: $capOut"
 [ -z "$(ctr_of web2-e2e-E)" ] && ok "T10 refused browser was not created" || bad "T10 E was created anyway"
 [ -n "$(ctr_of web2-e2e-A)" ] && ok "T10 existing browser not evicted" || bad "T10 A was evicted"
+
+# The limit is no longer a number a user can look up, so doctor must show it.
+# Needs a real threshold: the suite's own default of 0 prints "check disabled".
+docOut=$(env "${BASE_ENV[@]}" WEB2_MIN_FREE_MB=1024 "$BIN" doctor 2>&1)
+echo "$docOut" | grep -qE 'Docker VM memory: [0-9]+ of [0-9]+ MB available' \
+  && ok "T10 doctor reports VM memory" || bad "T10 doctor memory line: $docOut"
+echo "$docOut" | grep -qE 'Browser capacity: room for ~[0-9]+ more' \
+  && ok "T10 doctor reports remaining capacity" || bad "T10 doctor capacity line: $docOut"
 
 # --- T6: lock - parallel command gets busy error (exit 5) once the wait runs
 # out. The wait is shortened here on purpose: proving the busy path is about

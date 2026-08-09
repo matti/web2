@@ -417,7 +417,9 @@ web2 cookies list [--json] | clear         web2 record save|stop|start|dashcam
 web2 status     # oma selain: url, title, viewport, tabs, uptime, idle/ttl jäljellä
 web2 reset      # tuhoa oma kontti + käynnistä puhdas tilalle (2-5 s)
 web2 open vnc|novnc   # avaa OMAN selaimen katselu
-web2 doctor           # docker-tarkistukset; ei paljasta muiden sessioita
+web2 doctor           # docker-tarkistukset + Docker-VM:n vapaa muisti ja
+                      # montako selainta siihen vielä mahtuu; ei paljasta
+                      # muiden selaimia eikä niiden lukumäärää
 ```
 
 - **Ei ole**: `web2 session <mikään>`, `--name`, `destroy`, `list`, `ensure`.
@@ -539,7 +541,7 @@ web2/
     input.go         # upload-polkujen kopiointi konttiin (v1 sellaisenaan)
     output.go        # --output-polkujen rewrite + docker cp (v1 sellaisenaan)
     bundle.go        # embedded tar (v1 sellaisenaan)
-    doctor.go        # v1-pohja
+    doctor.go        # v1-pohja + kapasiteettiraportti
   src/               # v1:n src/ sellaisenaan: cli.ts, commands/, lib/
                      # muutokset: session.ts poistuu CLI-puusta (ks. Osa 9 K6);
                      # muu koskematta

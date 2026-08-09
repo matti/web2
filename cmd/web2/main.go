@@ -187,7 +187,7 @@ Browser:
   open vnc / open novnc           Watch this browser live
 
 Utilities:
-  doctor                          Check system requirements
+  doctor                          Check Docker, image, and browser capacity
   admin                           (human only)
 `)
 }
