@@ -532,7 +532,7 @@ describe("dismissCookieBanner", () => {
     // Simulate button found and clicked
     page.evaluate.mock.mockImplementation(async () => true);
 
-    await dismissCookieBanner(page as any);
+    await dismissCookieBanner(page as any, 0);
     assert.equal(page.evaluate.mock.calls.length, 1);
   });
 
@@ -545,7 +545,7 @@ describe("dismissCookieBanner", () => {
       return callCount === 1 ? false : undefined;
     });
 
-    await dismissCookieBanner(page as any);
+    await dismissCookieBanner(page as any, 0);
     assert.equal(page.evaluate.mock.calls.length, 2);
   });
 
@@ -563,7 +563,7 @@ describe("dismissCookieBanner", () => {
     });
     (page as any).frames = mock.fn(() => [cmpFrame]);
 
-    await dismissCookieBanner(page as any);
+    await dismissCookieBanner(page as any, 0);
     assert.equal(frameEvaluate.mock.calls.length, 1, "should have called evaluate on CMP frame");
   });
 
@@ -582,7 +582,7 @@ describe("dismissCookieBanner", () => {
     });
     (page as any).frames = mock.fn(() => [regularFrame]);
 
-    await dismissCookieBanner(page as any);
+    await dismissCookieBanner(page as any, 0);
     assert.equal(frameEvaluate.mock.calls.length, 0, "should not touch non-CMP frames");
   });
 });

@@ -43,7 +43,7 @@ openbox --config-file /etc/openbox/rc.xml &
 x11vnc -display :99 -passwd secret -forever -shared -rfbport 5900 -q &
 websockify --web /usr/share/novnc 6080 localhost:5900 >/dev/null 2>&1 &
 
-# CDP stays container-internal (127.0.0.1:19222) — the host checks readiness
+# CDP stays container-internal (127.0.0.1:19222) - the host checks readiness
 # via `docker exec test -f $STATE_DIR/.web-ready`, so no tunnel is needed.
 
 # Pre-create user data dir for clean Chrome profile
@@ -56,7 +56,7 @@ EOF
 # Launch Chromium with remote debugging on localhost only
 #
 # Stealth flags:
-#   --disable-blink-features=AutomationControlled  — removes navigator.webdriver,
+#   --disable-blink-features=AutomationControlled  - removes navigator.webdriver,
 #                                                    the main signal Playwright
 #                                                    leaves that basic bot
 #                                                    detection (Alibaba Baxia,
@@ -115,12 +115,12 @@ touch "$STATE_DIR/.web-heartbeat"
     now=$(date +%s)
     hb=$(stat -c %Y "$STATE_DIR/.web-heartbeat" 2>/dev/null || echo "$now")
     if [ $(( now - hb )) -gt "$IDLE_TIMEOUT" ]; then
-      echo "Idle timeout ($(( now - hb ))s > ${IDLE_TIMEOUT}s) — shutting down" >&2
+      echo "Idle timeout ($(( now - hb ))s > ${IDLE_TIMEOUT}s) - shutting down" >&2
       kill $CHROME_PID 2>/dev/null
       break
     fi
     if [ $(( now - START_TS )) -gt "$TTL" ]; then
-      echo "TTL reached ($(( now - START_TS ))s > ${TTL}s) — shutting down" >&2
+      echo "TTL reached ($(( now - START_TS ))s > ${TTL}s) - shutting down" >&2
       kill $CHROME_PID 2>/dev/null
       break
     fi

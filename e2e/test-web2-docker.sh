@@ -27,7 +27,7 @@ B=(env "${BASE_ENV[@]}" CLAUDE_CODE_SESSION_ID=web2-e2e-B "$BIN")
 remove_test_containers() {
   docker ps -aq --filter "label=web2=true" | while read -r id; do
     key=$(docker inspect --format '{{index .Config.Labels "web2.owner.key"}}' "$id" 2>/dev/null)
-    case "$key" in cc:web2-e2e-*) docker rm -f "$id" >/dev/null 2>&1 ;; esac
+    case "$key" in cc:web2-e2e-*|agent:web2e2esub*) docker rm -f "$id" >/dev/null 2>&1 ;; esac
   done
 }
 cleanup() {
@@ -39,7 +39,8 @@ remove_test_containers 2>/dev/null || true
 
 (cd "$REPO_DIR/cmd/web2" && go build -o "$BIN" .) || { echo "FAIL: go build"; exit 1; }
 
-ctr_of() { docker ps -q --filter "label=web2.owner.key=cc:$1" | head -1; }
+ctr_of_key() { docker ps -q --filter "label=web2.owner.key=$1" | head -1; }
+ctr_of()     { ctr_of_key "cc:$1"; }
 
 # --- T2: memorylessness - 3 separate processes, same browser, state persists
 "${A[@]}" exec "globalThis.x = 42" >/dev/null 2>&1
@@ -151,6 +152,53 @@ ctrA=$(ctr_of web2-e2e-A)
 held=$(docker exec "$ctrA" sh -c 'grep -c FLOCK /proc/locks' 2>/dev/null | tr -d '\r')
 [ "${held:-1}" = "0" ] && ok "T12 no flock held after the command exits" \
   || bad "T12 $held flock(s) still held after the command exited"
+
+# --- T13: subagent isolation. Every subagent of one Claude Code session
+# inherits the same CLAUDE_CODE_SESSION_ID and the same agent ancestor, so on
+# the environment alone they are indistinguishable: they all resolved to one
+# browser and overwrote each other's pages. The harness knows who is calling
+# and tells the PreToolUse hook, which passes it down as WEB2_AGENT. Proven
+# end to end here, starting from a real hook payload on stdin.
+TOOL_INPUT='"tool_input":{"command":"web2 exec 1","description":"d"}'
+rewritten=$(printf '%s' "{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"agent_id\":\"web2e2esubA\",$TOOL_INPUT}" \
+  | "$BIN" hook pretooluse 2>/dev/null)
+echo "$rewritten" | grep -q 'export WEB2_AGENT=web2e2esubA; web2 exec 1' \
+  && ok "T13 hook rewrites a subagent's command" || bad "T13 hook output: $rewritten"
+
+mainOut=$(printf '%s' "{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",$TOOL_INPUT}" \
+  | "$BIN" hook pretooluse 2>/dev/null)
+[ -z "$mainOut" ] && ok "T13 main session is left alone" || bad "T13 main session rewritten: $mainOut"
+
+# Two subagents of ONE session, exactly as the hook would invoke them. Their
+# browsers are started in parallel: they are separate owners with separate
+# locks, so serializing them would only buy a second container startup.
+SUBA=(env "${BASE_ENV[@]}" CLAUDE_CODE_SESSION_ID=web2-e2e-A WEB2_AGENT=web2e2esubA "$BIN")
+SUBB=(env "${BASE_ENV[@]}" CLAUDE_CODE_SESSION_ID=web2-e2e-A WEB2_AGENT=web2e2esubB "$BIN")
+"${A[@]}"    exec "globalThis.mark = 'parent'" >/dev/null 2>&1
+"${SUBA[@]}" exec "globalThis.mark = 'subA'"   >/dev/null 2>&1 &
+subAPid=$!
+"${SUBB[@]}" exec "globalThis.mark = 'subB'"   >/dev/null 2>&1 &
+wait "$subAPid" $! 2>/dev/null
+
+outSubA=$("${SUBA[@]}" exec "globalThis.mark" 2>/dev/null)
+[ "$outSubA" = '"subA"' ] && ok "T13 subagent A kept its own page" \
+  || bad "T13 subagent A saw '$outSubA', want \"subA\""
+outParent=$("${A[@]}" exec "globalThis.mark" 2>/dev/null)
+[ "$outParent" = '"parent"' ] && ok "T13 subagents did not touch the parent's page" \
+  || bad "T13 parent saw '$outParent', want \"parent\""
+
+ctrParent=$(ctr_of web2-e2e-A)
+ctrSubA=$(ctr_of_key "agent:web2e2esubA")
+ctrSubB=$(ctr_of_key "agent:web2e2esubB")
+distinct=$(printf '%s\n%s\n%s\n' "$ctrParent" "$ctrSubA" "$ctrSubB" | sort -u | grep -c .)
+[ "$distinct" = "3" ] && ok "T13 parent and both subagents got their own browser" \
+  || bad "T13 expected 3 browsers, got $distinct (parent=$ctrParent A=$ctrSubA B=$ctrSubB)"
+
+# An owner the caller set explicitly still wins over the injected one.
+explicitOut=$(printf '%s' "{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"agent_id\":\"web2e2esubA\",\"tool_input\":{\"command\":\"WEB2_SESSION=ci web2 status\"}}" \
+  | "$BIN" hook pretooluse 2>/dev/null)
+[ -z "$explicitOut" ] && ok "T13 explicit WEB2_SESSION is not overridden" \
+  || bad "T13 explicit owner was rewritten: $explicitOut"
 
 echo ""
 echo "docker tests: $PASS passed, $FAIL failed"

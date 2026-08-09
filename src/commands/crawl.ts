@@ -179,7 +179,7 @@ function writeResults(
       const slug = dedupeSlug(r.slug, usedSlugs);
       const filename = `${slug}.md`;
       writeFileSync(join(output, filename), formatArticle(r.article));
-      index += `- [${r.article.title}](${filename}) — ${r.url}\n`;
+      index += `- [${r.article.title}](${filename}) - ${r.url}\n`;
     }
 
     writeFileSync(join(output, "_index.md"), index);

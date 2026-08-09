@@ -7,7 +7,7 @@ const STATE_FILE = `${STATE_DIR}/.web-tab-state`;
 
 function getContext(browser: Browser) {
   const contexts = browser.contexts();
-  // Prefer the context that owns pages — with extensions loaded, context
+  // Prefer the context that owns pages - with extensions loaded, context
   // ordering is not deterministic and an extension context may come first.
   const ctx = contexts.find((c) => c.pages().length > 0) ?? contexts[0];
   if (!ctx) throw new Error("No browser context");
@@ -89,7 +89,7 @@ export async function tabList(): Promise<void> {
       const marker = i === activeIdx ? "*" : " ";
       const title = await pages[i].title().catch(() => "");
       const url = pages[i].url();
-      process.stdout.write(`${marker} [${i}] ${title || "(untitled)"} — ${url}\n`);
+      process.stdout.write(`${marker} [${i}] ${title || "(untitled)"} - ${url}\n`);
     }
   });
 }
@@ -103,7 +103,7 @@ export async function tabCreate(url?: string): Promise<void> {
     if (url) {
       await page.goto(url, { waitUntil: "domcontentloaded" });
     }
-    // Do NOT bringToFront — that races on .web-tab-state with concurrent
+    // Do NOT bringToFront - that races on .web-tab-state with concurrent
     // callers. The new tab is addressable via its target ID (stdout) and
     // env var WEB_TAB_ID; caller decides whether to make it active.
     const id = await targetId(page);

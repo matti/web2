@@ -66,22 +66,29 @@ function clickAcceptButton(): boolean {
   return false;
 }
 
-export async function dismissCookieBanner(page: Page): Promise<void> {
+/**
+ * Dismiss a cookie consent banner.
+ *
+ * settleMs is how long to let the banner's dismissal animation finish before
+ * the caller reads the page. It is a parameter only so tests can pass 0:
+ * against a mocked page the wait proves nothing and cost a real second.
+ */
+export async function dismissCookieBanner(page: Page, settleMs = 500): Promise<void> {
   const clicked = await page.evaluate(clickAcceptButton);
 
   if (clicked) {
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, settleMs));
     return;
   }
 
-  // Try CMP iframes (Sourcepoint, OneTrust, etc.) — cross-origin but accessible via Playwright
+  // Try CMP iframes (Sourcepoint, OneTrust, etc.) - cross-origin but accessible via Playwright
   if (typeof page.frames === "function") {
     for (const frame of page.frames()) {
       if (cmpFramePatterns.test(frame.url())) {
         try {
           const frameClicked = await frame.evaluate(clickAcceptButton);
           if (frameClicked) {
-            await new Promise((r) => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, settleMs));
             return;
           }
         } catch { /* frame may have navigated away */ }

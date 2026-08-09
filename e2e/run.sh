@@ -14,7 +14,7 @@ for arg in "$@"; do
     e2e|crawl|interact) RUN_GROUPS+=("$arg") ;;
   esac
 done
-# Default: fast group only. crawl/interact are rate-limited and slow —
+# Default: fast group only. crawl/interact are rate-limited and slow -
 # run them explicitly (./e2e/run.sh crawl) or with --all.
 [ ${#RUN_GROUPS[@]} -eq 0 ] && RUN_GROUPS=(e2e)
 
@@ -35,6 +35,15 @@ fi
 
 CHROMIUM=$(node -e "console.log(require('playwright').chromium.executablePath())")
 CHROME_PIDS=()
+
+# Node 24+ strips types natively. `npx tsx` costs ~700ms per script (npx
+# resolution + tsx boot) and this group starts a dozen processes, so prefer
+# plain node and keep tsx only as the fallback for older runtimes.
+if node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)' 2>/dev/null; then
+  TS_RUNNER=(node)
+else
+  TS_RUNNER=("$REPO_DIR/node_modules/.bin/tsx")
+fi
 
 launch_chromium() {
   local port="$1"
@@ -66,7 +75,7 @@ E2E_TMPDIR="$(mktemp -d)"
 
 # Start shared mock server
 MOCK_URLFILE="$E2E_TMPDIR/shared-mock-url"
-npx tsx "$REPO_DIR/src/tests/mock-server.ts" > "$MOCK_URLFILE" 2>/dev/null &
+"${TS_RUNNER[@]}" "$REPO_DIR/src/tests/mock-server.ts" > "$MOCK_URLFILE" 2>/dev/null &
 MOCK_PID=$!
 
 for i in $(seq 1 50); do
@@ -114,7 +123,7 @@ run_script() {
     echo ""
     echo "==> $name"
     if [ "$ext" = "ts" ]; then
-      if CDP_PORT="$port" WEB_STATE_DIR="$state_dir" npx tsx "$test_script"; then
+      if CDP_PORT="$port" WEB_STATE_DIR="$state_dir" "${TS_RUNNER[@]}" "$test_script"; then
         echo "1 0" > "$E2E_TMPDIR/${name}.result"
       else
         echo "0 1" > "$E2E_TMPDIR/${name}.result"
@@ -207,7 +216,7 @@ for name in "${SCRIPT_NAMES[@]}"; do
   fi
 done
 
-# Docker tests (sequential, separate — cover isolation, memorylessness,
+# Docker tests (sequential, separate - cover isolation, memorylessness,
 # lifecycle, locking, admin gate against real containers)
 if [ "$RUN_DOCKER" -eq 1 ] && [ -f "$REPO_DIR/e2e/test-web2-docker.sh" ]; then
   echo ""

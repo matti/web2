@@ -12,6 +12,9 @@ anyone else:
 - Identity is **derived from the environment** (agent session id, ancestor
   process, terminal), so parallel agents on one machine get fully isolated
   browsers without carrying any state between commands.
+- **Subagents count as callers too.** They are indistinguishable from their
+  parent in the environment, so the plugin ships a hook that hands each one
+  its own browser - a fan-out of subagents no longer fights over one page.
 - No command on the agent surface can see or touch another owner's browser.
   Cross-owner operations live under `web2 admin`, which refuses to run inside
   an agent unless the user sets `WEB2_ADMIN=1`.
@@ -56,8 +59,15 @@ That's it. The skills are now available in every session as `/web2:go`,
 `web2` CLI directly. Updates flow straight from the directory - no
 reinstall needed.
 
+The plugin also installs a `PreToolUse` hook (`hooks/hooks.json`) that gives
+every **subagent** its own browser instead of letting them all share the
+parent's. Nothing to configure: it only touches Bash commands that run `web2`,
+and it leaves the main session alone.
+
 Alternative without the plugin system: copy `skills/*` into
-`~/.claude/skills/` (skills appear without the `web2:` prefix).
+`~/.claude/skills/` (skills appear without the `web2:` prefix) and, if you use
+subagents, copy the `hooks` block from `hooks/hooks.json` into your
+`settings.json` - otherwise subagents fall back to sharing one browser.
 
 ## Inside the box
 

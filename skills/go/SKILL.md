@@ -1,13 +1,13 @@
 ---
 name: web2-go
-description: "Navigate to a URL and interact with the page — click, fill forms, extract data, take screenshots. Use for any multi-step browser task."
+description: "Navigate to a URL and interact with the page - click, fill forms, extract data, take screenshots. Use for any multi-step browser task."
 allowed-tools: Bash, Write, Read, Glob
 argument-hint: <url> [goal]
 ---
 
 Navigate to a URL and interact with the page. This is the main browser skill
 for multi-step tasks. Your browser starts automatically on the first command
-and cleans itself up when idle — there is nothing to set up or tear down, and
+and cleans itself up when idle - there is nothing to set up or tear down, and
 no other browser is visible to you.
 
 ```bash
@@ -15,7 +15,7 @@ web2 go <url>
 ```
 
 Every page-changing command ends with a grounding line on stderr
-(`→ <url> — "<title>"`) so you always know where the browser is.
+(`→ <url> - "<title>"`) so you always know where the browser is.
 
 ## Commands
 
@@ -36,7 +36,7 @@ Every page-changing command ends with a grounding line on stderr
 - `web2 status` -- where am I: url, title, viewport, tabs
 
 ### Interact
-- `web2 do click <selector> [--text "Button Text"]` -- click
+- `web2 do click <selector> [--text "Button Text"] [--double] [--right]` -- click
 - `web2 do fill <selector> <value> [--clear]` -- fill input
 - `web2 do type <text> [--selector SEL]` -- type text
 - `web2 do press <key>` -- press key (Enter, Tab, Escape, ArrowDown, ...)
@@ -52,8 +52,15 @@ Every page-changing command ends with a grounding line on stderr
 - `web2 wait network-idle` -- wait for network to settle
 - `web2 wait url:<pattern>` -- wait for URL match
 
+### Tabs
+- `web2 tab list` -- list open tabs (`*` marks the active one)
+- `web2 tab create [url]` -- open a new tab
+- `web2 tab select <index>` / `web2 tab next` / `web2 tab previous` -- switch
+- `web2 tab close [index]` -- close a tab (the active one if omitted)
+
 ### Other
 - `web2 exec <js>` -- run JavaScript
+- `web2 viewport preset <mobile|tablet|desktop|1080p>` -- resize the viewport
 - `web2 network [--json]` -- network requests
 - `web2 pdf [--output FILE]` -- save as PDF
 - `web2 cookies list [--json]` / `web2 cookies clear`
@@ -70,4 +77,4 @@ web2 page screenshot --output .web2-screenshot.png
 ## Errors
 
 Errors are one line and tell you what to do next. `browser busy` (exit 5)
-means another of your own commands holds the browser — retry shortly.
+means another of your own commands holds the browser - retry shortly.

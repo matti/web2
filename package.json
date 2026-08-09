@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "build:cli": "cd cmd/web2 && go build -o web2 .",
-    "test": "npx tsx --test 'src/tests/**/*.test.ts'",
+    "test": "tsx --test 'src/tests/**/*.test.ts'",
     "test:e2e": "./e2e/run.sh",
     "test:docker": "./e2e/run.sh --docker"
   },

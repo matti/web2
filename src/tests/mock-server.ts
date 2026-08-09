@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 // --- HTML helpers ---
@@ -174,8 +174,49 @@ const PAGES: Record<string, () => string> = {
   </select>
   <button type="submit" id="submit-btn">Submit</button>
   <button type="button" id="click-btn" onclick="document.getElementById('result').textContent='clicked'">Click Me</button>
+  <button type="button" id="double-btn" ondblclick="document.getElementById('result').textContent='double-clicked'">Double Click Me</button>
+  <div id="context-target" oncontextmenu="event.preventDefault(); document.getElementById('result').textContent='right-clicked'">Right Click Me</div>
   <div id="result"></div>
 </form>
+</body></html>`,
+
+  // File inputs report the attached names and sizes so upload can be
+  // verified through the page, not only through the command's own output.
+  "/upload": () => `<!DOCTYPE html>
+<html><head><title>Upload Page</title></head>
+<body>
+<label>Single file <input type="file" id="single-file"></label>
+<output id="single-result"></output>
+<label>Multiple files <input type="file" id="multiple-files" multiple></label>
+<output id="multiple-result"></output>
+<script>
+  const describeFiles = (input) =>
+    Array.from(input.files, (file) => file.name + ':' + file.size).join(',');
+  document.getElementById('single-file').addEventListener('change', (event) => {
+    document.getElementById('single-result').textContent = describeFiles(event.target);
+  });
+  document.getElementById('multiple-files').addEventListener('change', (event) => {
+    document.getElementById('multiple-result').textContent = describeFiles(event.target);
+  });
+</script>
+</body></html>`,
+
+  // Exercises wait conditions against real asynchronous browser state.
+  //
+  // The page records its own starting state, so a test can prove the wait
+  // observed a real transition without racing the timer: asking the browser
+  // "is the spinner still here?" before waiting costs a CLI round trip and
+  // eats the very window the test needs.
+  "/wait-states": () => `<!DOCTYPE html>
+<html><head><title>Wait States</title></head>
+<body>
+<div id="spinner">Working...</div>
+<script>
+  window.__spinnerExisted = document.getElementById('spinner') !== null;
+  window.__initialPath = location.pathname;
+  setTimeout(() => document.getElementById('spinner').remove(), 1500);
+  setTimeout(() => history.replaceState(null, '', '/wait-complete'), 1500);
+</script>
 </body></html>`,
 
   // Hover page (tooltip on hover)
@@ -301,7 +342,7 @@ function handler(baseUrl: string, req: IncomingMessage, res: ServerResponse): vo
     return;
   }
   if (path === "/slow/forever") {
-    // Never respond — tests navigate timeout
+    // Never respond - tests navigate timeout
     return;
   }
 
@@ -321,12 +362,12 @@ function handler(baseUrl: string, req: IncomingMessage, res: ServerResponse): vo
   // Error pages
   if (path === "/error/404") {
     res.writeHead(404, { "Content-Type": "text/html" });
-    res.end(htmlPage("Not Found", "<p>404 — page not found.</p>"));
+    res.end(htmlPage("Not Found", "<p>404 - page not found.</p>"));
     return;
   }
   if (path === "/error/500") {
     res.writeHead(500, { "Content-Type": "text/html" });
-    res.end(htmlPage("Server Error", "<p>500 — internal server error.</p>"));
+    res.end(htmlPage("Server Error", "<p>500 - internal server error.</p>"));
     return;
   }
 
@@ -354,7 +395,7 @@ function handler(baseUrl: string, req: IncomingMessage, res: ServerResponse): vo
 
   // Default: 404
   res.writeHead(404, { "Content-Type": "text/html" });
-  res.end(htmlPage("Not Found", "<p>404 — page not found.</p>"));
+  res.end(htmlPage("Not Found", "<p>404 - page not found.</p>"));
 }
 
 // --- Start server ---

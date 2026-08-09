@@ -175,13 +175,14 @@ describe("RateLimiter", () => {
   });
 
   it("delays when burst exceeds rps", async () => {
-    const limiter = new RateLimiter(2);
+    // 100ms window: the blocking path is identical, the test is 10x cheaper.
+    const limiter = new RateLimiter(2, 100);
     const start = Date.now();
     await limiter.wait();
     await limiter.wait();
     await limiter.wait(); // 3rd call should block until window expires
     const elapsed = Date.now() - start;
-    assert.ok(elapsed >= 900, `expected >= 900ms, got ${elapsed}ms`);
+    assert.ok(elapsed >= 90, `expected >= 90ms, got ${elapsed}ms`);
   });
 });
 

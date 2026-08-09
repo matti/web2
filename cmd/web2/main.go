@@ -31,9 +31,17 @@ const (
 )
 
 func main() {
+	args := os.Args[1:]
+
+	// The PreToolUse hook runs on every Bash tool call in the harness, so it
+	// dispatches before rebuild and reaper work ever starts.
+	if len(args) > 0 && args[0] == "hook" {
+		cmdHook(args[1:])
+		return
+	}
+
 	maybeRebuild()
 
-	args := os.Args[1:]
 	if len(args) == 0 {
 		usage()
 		os.Exit(0)
@@ -69,7 +77,9 @@ func main() {
 
 func isHostCommand(name string) bool {
 	switch name {
-	case "status", "reset", "open", "doctor", "admin", "help", "-h", "--help":
+	// "hook" is deliberately absent from usage(): it is the harness talking
+	// to web2, never an agent or a human. main() dispatches it before this.
+	case "status", "reset", "open", "doctor", "admin", "hook", "help", "-h", "--help":
 		return true
 	default:
 		return false
@@ -116,13 +126,17 @@ Browse:
   go <url> [--wait strategy]      Navigate to a URL
   reload [--wait strategy]        Reload the current page
   exec <js>                       Execute JavaScript
-  wait <condition> [--timeout]    Wait for selector, text, URL, or network-idle
+  wait <cond> [--timeout]         Wait for a selector, text:, url:, hidden:,
+                                  or network-idle
   crawl [--depth N] [--limit N]   Crawl site from current page
+  normalize <dir>                 Crawled DOM to sorted TSV for proofreading
   pdf [--output f] [--format f]   Generate PDF of current page
+  network [--json]                Requests captured during last navigation
 
 Page:
-  page screenshot [--output] [--full-page]  Take a screenshot
+  page screenshot [--output] [--full-page] [--selector]  Take a screenshot
   page view [--full-page] [--width]         View page in terminal
+  page tail [--interval ms]                 Live-refreshing page view
 
 Viewport:
   viewport resize <w> <h>         Set viewport dimensions
@@ -147,8 +161,8 @@ Extract:
   extract text                    Dump page text
 
 Do:
-  do click <sel> [--text T]       Click an element
-  do fill <sel> <value>           Fill a form field
+  do click <sel> [--text T] [--double] [--right]   Click an element
+  do fill <sel> [value] [--clear]  Fill or clear a form field
   do upload <sel> <file...>       Attach file(s) to an <input type=file>
   do type <text> [--selector S]   Type text into focused element
   do press <key>                  Press a key (Enter, Tab, Escape, ...)

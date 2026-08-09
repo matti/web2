@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Owner identity resolution — the core of web2.
+// Owner identity resolution - the core of web2.
 //
 // Every invocation derives a stable owner key from the environment instead of
 // requiring the caller to remember one. An LLM agent cannot carry state
@@ -22,12 +22,13 @@ import (
 type OwnerKind string
 
 const (
-	KindNamed OwnerKind = "named" // WEB2_SESSION — explicit opt-in (humans, CI, tests)
-	KindAgent OwnerKind = "agent" // agent harness session uuid from env
-	KindProc  OwnerKind = "proc"  // nearest agent ancestor process
-	KindTerm  OwnerKind = "term"  // terminal session uuid
-	KindTTY   OwnerKind = "tty"   // controlling tty device
-	KindUID   OwnerKind = "uid"   // last resort: one browser per user
+	KindNamed    OwnerKind = "named"    // WEB2_SESSION - explicit opt-in (humans, CI, tests)
+	KindSubagent OwnerKind = "subagent" // WEB2_AGENT - per-subagent id injected by the hook
+	KindAgent    OwnerKind = "agent"    // agent harness session uuid from env
+	KindProc     OwnerKind = "proc"     // nearest agent ancestor process
+	KindTerm     OwnerKind = "term"     // terminal session uuid
+	KindTTY      OwnerKind = "tty"      // controlling tty device
+	KindUID      OwnerKind = "uid"      // last resort: one browser per user
 )
 
 type Owner struct {
@@ -68,7 +69,7 @@ type Environment struct {
 }
 
 // agentSessionEnvs: env vars that identify an agent session. Extension point
-// for other harnesses — adding support is one line here.
+// for other harnesses - adding support is one line here.
 var agentSessionEnvs = []struct{ env, prefix string }{
 	{"CLAUDE_CODE_SESSION_ID", "cc"},
 }
@@ -88,12 +89,21 @@ const maxWalkDepth = 15
 
 // ResolveOwner derives the caller's owner identity. First match wins:
 //
-//  1. WEB2_SESSION            → named (explicit)
-//  2. agent session env vars  → agent (e.g. CLAUDE_CODE_SESSION_ID)
-//  3. ancestor walk           → proc  (nearest known agent binary)
-//  4. terminal session id     → term  (ITERM_SESSION_ID / TERM_SESSION_ID)
-//  5. controlling tty         → tty
-//  6. uid                     → uid
+//  1. WEB2_SESSION            → named    (explicit)
+//  2. WEB2_AGENT              → subagent (injected by the PreToolUse hook)
+//  3. agent session env vars  → agent    (e.g. CLAUDE_CODE_SESSION_ID)
+//  4. ancestor walk           → proc     (nearest known agent binary)
+//  5. terminal session id     → term     (ITERM_SESSION_ID / TERM_SESSION_ID)
+//  6. controlling tty         → tty
+//  7. uid                     → uid
+//
+// Step 2 exists because every subagent of one harness session inherits the
+// same session uuid and the same agent ancestor: from inside a Bash call
+// nothing distinguishes them, so steps 3-7 would put them all in one browser
+// and they would overwrite each other's pages. The harness does know which
+// subagent is calling, and tells the PreToolUse hook (hook.go), which passes
+// it down as WEB2_AGENT. Without the hook the chain degrades to the shared
+// browser - never to another owner's.
 //
 // v1's WEB_* variables are deliberately never read (coexistence).
 func ResolveOwner(e Environment) Owner {
@@ -106,18 +116,26 @@ func ResolveOwner(e Environment) Owner {
 	// it as a liveness hint label on the container.
 	ancestor, hasAncestor := findAgentAncestor(e.Tree)
 
+	// withAncestor attaches the liveness hint the reaper and admin surface use.
+	withAncestor := func(o Owner) Owner {
+		if hasAncestor {
+			o.PID = ancestor.PID
+			o.StartTime = ancestor.StartTime
+		}
+		return o
+	}
+
 	if v := getenv("WEB2_SESSION"); v != "" {
 		return Owner{Key: "named:" + v, Kind: KindNamed}
 	}
 
+	if v := getenv("WEB2_AGENT"); validAgentID(v) {
+		return withAncestor(Owner{Key: "agent:" + v, Kind: KindSubagent})
+	}
+
 	for _, a := range agentSessionEnvs {
 		if v := getenv(a.env); v != "" {
-			o := Owner{Key: a.prefix + ":" + v, Kind: KindAgent}
-			if hasAncestor {
-				o.PID = ancestor.PID
-				o.StartTime = ancestor.StartTime
-			}
-			return o
+			return withAncestor(Owner{Key: a.prefix + ":" + v, Kind: KindAgent})
 		}
 	}
 

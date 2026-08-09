@@ -1,4 +1,4 @@
-# web2 — agenttioptimoitu selain-CLI: toteutusdokumentti
+# web2 - agenttioptimoitu selain-CLI: toteutusdokumentti
 
 Tämä dokumentti on riittävä `web2`:n toteuttamiseen ilman pääsyä v1-repoon tai
 lisäkysymyksiä. Kohdekäyttäjä on **agentti** (Claude Code ja vastaavat), ei
@@ -20,17 +20,17 @@ admin-pintaa pidemmälle.
 
 ---
 
-## Osa 0: Toteutuskielet — päätös ja perustelut
+## Osa 0: Toteutuskielet - päätös ja perustelut
 
 **Host-binääri: Go. Kontin selainajuri: TypeScript (Node + Playwright).**
 
 | Kriteeri | Ratkaisu |
 |---|---|
-| Playwright-tuki | TS on Playwrightin referenssitoteutus; featuret (mm. aria snapshot, jonka päälle semdown-ekstraktio rakentuu) laskeutuvat sinne ensin. Rustille ei ole virallista Playwrightia — vain CDP-kirjastoja ilman auto-waitingia, selector-engineä ja aria-snapshotia. Python olisi kelvollinen kakkonen, mutta TS voittaa v1-koodin uudelleenkäytöllä. |
-| Muistiturva | Rustin etu on olematon tässä: host-binääri on ~1500 rivin docker exec -orkestraattori, ja Go on myös muistiturvallinen (GC). Ainoa muistiturvaton komponentti on Chromium (C++), jonka eristää Docker — turvaraja on kontti, ei kieli. |
+| Playwright-tuki | TS on Playwrightin referenssitoteutus; featuret (mm. aria snapshot, jonka päälle semdown-ekstraktio rakentuu) laskeutuvat sinne ensin. Rustille ei ole virallista Playwrightia - vain CDP-kirjastoja ilman auto-waitingia, selector-engineä ja aria-snapshotia. Python olisi kelvollinen kakkonen, mutta TS voittaa v1-koodin uudelleenkäytöllä. |
+| Muistiturva | Rustin etu on olematon tässä: host-binääri on ~1500 rivin docker exec -orkestraattori, ja Go on myös muistiturvallinen (GC). Ainoa muistiturvaton komponentti on Chromium (C++), jonka eristää Docker - turvaraja on kontti, ei kieli. |
 | Kirjoittajan tuottavuus | Koodin kirjoittaa ja lukee agentti, ei ihminen → optimoidaan mallin tarkkuudelle ja palautesilmukalle. Go ja TS: nopeimmat työkaluketjut (`go test` ms-luokkaa, `node:test` < 3 s), suurin luotettavuus generoinnissa. Rustin käännösajat söisivät TDD-rytmin. |
 | Jakelu | Go → yksi staattinen ~8 MB binääri, triviaali ristikäännös (macOS/Linux, arm/x86). "Host tarvitsee vain Dockerin ja binäärin" säilyy. Kontin TS ei koskaan poistu kontista. |
-| Uudelleenkäyttö | v1:n `src/` (komennot, extract, stealth) siirtyy lähes koskematta — valmista, testattua Playwright-koodia. |
+| Uudelleenkäyttö | v1:n `src/` (komennot, extract, stealth) siirtyy lähes koskematta - valmista, testattua Playwright-koodia. |
 
 Hylätyt vaihtoehdot: *kaikki Rustilla* (ei Playwrightia, hitain silmukka, ei
 hyötyä); *kaikki TS:llä + bun compile -host* (yksi kieli, mutta ~90 MB binääri,
@@ -50,7 +50,7 @@ ja syyt ovat rakenteellisia:
    session yli, eikä sitä ole olemassa headless-ympäristöissä: terminaali-CC,
    SSH, CI, cron/scheduled-ajot, `claude -p`. web2-kontti on detached-prosessi
    jota mikä tahansa ympäristö käskyttää.
-2. **Ei isolaatiota.** Yksi selain per appi — ei per-agentti-maailmoja.
+2. **Ei isolaatiota.** Yksi selain per appi - ei per-agentti-maailmoja.
    Rinnakkaiset agentit ja subagentit jakavat saman selaimen tilan (cookiet,
    kirjautumiset, tabit) ilman mitään rajaa, ja selain ajaa käyttäjän
    työpöytäkontekstissa ilman Docker-eristystä. web2:ssa jokainen agentti saa
@@ -60,17 +60,17 @@ ja syyt ovat rakenteellisia:
    banneritaistelulla, joka syö askelia ja tokeneita. web2:ssa IDCAC-extension
    hoitaa bannerit ennen kuin agentti näkee sivua, ja `do dismiss` on
    fallback.
-4. **Ei tekstiekstraktiota.** GUI antaa agentille screenshotteja — pikselien
+4. **Ei tekstiekstraktiota.** GUI antaa agentille screenshotteja - pikselien
    lukeminen on tokenikallista ja epätarkkaa. web2:n ydin on
    aria-snapshot → semdown, `extract reader` (Readability), `extract table`
-   (CSV/JSON), `extract links/text/source` — LLM:lle natiivia tekstiä, jonka
+   (CSV/JSON), `extract links/text/source` - LLM:lle natiivia tekstiä, jonka
    päälle voi rakentaa luotettavaa automaatiota.
 5. **Ei komposoitavuutta.** Ei crawlia, ei pdf:ää, ei network-lokia, ei
    `exec <js>`:ää, ei viewport-presettejä, ei tiedostoon tallennusta, ei
-   putkitusta — GUI:n tulos ei ole data vaan kuva ruudulla. web2:n jokainen
+   putkitusta - GUI:n tulos ei ole data vaan kuva ruudulla. web2:n jokainen
    komento on skriptattava, `--json`-moodillinen ja testattava.
 6. **Ei havainnointia jälkikäteen.** web2:ssa on aina päällä oleva dashcam
-   (rullaava 5 min video) ja VNC/noVNC-ikkuna omaan selaimeen — kun jokin
+   (rullaava 5 min video) ja VNC/noVNC-ikkuna omaan selaimeen - kun jokin
    meni pieleen, voi katsoa mitä oikeasti tapahtui. GUI:ssa on vain se mitä
    keskusteluun jäi.
 
@@ -85,7 +85,7 @@ autonomiselle ja rinnakkaiselle agenttityölle.
 Juurisyy ei ole yksittäinen bugi vaan väärä perusoletus: *kutsujalla on vakaa
 prosessi-identiteetti ja muisti*. Agentilla ei ole kumpaakaan.
 
-### 1.1 `callerPID()` on epävakaa — mitattu fakta
+### 1.1 `callerPID()` on epävakaa - mitattu fakta
 
 v1 (`cmd/web/main.go:17`) käyttää `os.Getppid()` session nimenä. Claude Code
 käynnistää **joka Bash-työkalukutsulle uuden zsh-prosessin**. Mitattu: kolme
@@ -96,14 +96,14 @@ v1:n `web`-komento resolvautuu eri session nimeen.
 
 v1 (`cmd/web/session.go:382`): PID-nimetty sessio siivotaan kun omistaja-PID
 kuolee. Bash-kutsun shell kuolee millisekunteja komennon jälkeen → seuraava
-kutsu reapaa juuri luodun session. Lisäksi PID:t kierrätetään — pelkkä
+kutsu reapaa juuri luodun session. Lisäksi PID:t kierrätetään - pelkkä
 `kill(pid, 0)` voi osua vieraaseen prosessiin ja pitää orpoa hengissä.
 
 ### 1.3 Fallback-ketju ohjaa komennot vieraisiin sessioihin
 
-v1:n `resolveSession()` → oma PID ei löydy (1.1–1.2) → fallback
+v1:n `resolveSession()` → oma PID ei löydy (1.1-1.2) → fallback
 `resolveContainer()`: "web-default" tai *mikä tahansa yksittäinen ajossa oleva
-sessio*. Tällä polulla systeemi "toimii" yhdellä agentilla — ja täsmälleen
+sessio*. Tällä polulla systeemi "toimii" yhdellä agentilla - ja täsmälleen
 samalla polulla agentti B:n komennot laskeutuvat agentti A:n selaimeen.
 
 ### 1.4 Muiden sessiot ovat näkyvissä ja tuhottavissa
@@ -116,7 +116,7 @@ on yhden tokenin päässä.
 ### 1.5 Kaikki eksplisiittinen tila unohtuu
 
 v1:n `WEB_SESSION`, `--name`, `WEB_TAB_ID`, skillin `web session ensure`
--boilerplate — kaikki vaativat, että agentti kuljettaa arvon tai askeleen
+-boilerplate - kaikki vaativat, että agentti kuljettaa arvon tai askeleen
 jokaiseen tulevaan Bash-kutsuun. Env ei säily kutsujen välillä ja LLM unohtaa
 luotettavasti. **Sääntö web2:lle: mikään oikeellisuuden kannalta pakollinen
 asia ei saa nojata agentin muistiin.**
@@ -144,7 +144,7 @@ Mitattu Claude Coden Bash-työkalun sisällä (2026-07-13, CC 2.1.207, macOS):
 |---|---|---|
 | `CLAUDE_CODE_SESSION_ID` | `83a6bc37-696d-...` | **Vakaa koko Claude-session ajan, kaikissa Bash-kutsuissa** |
 | Sama env subagentissa | sama uuid | **Subagentit perivät emon session-ID:n** (todennettu Agent-työkalulla) |
-| `CLAUDECODE=1`, `AI_AGENT=claude-code_*` | | Kertoo "olen agentin sisällä" — admin-gaten signaali |
+| `CLAUDECODE=1`, `AI_AGENT=claude-code_*` | | Kertoo "olen agentin sisällä": admin-gaten signaali |
 | Shellin PID (`$$`, `getppid()`) | eri joka kutsulla | **Käyttökelvoton** |
 | `claude`-prosessin PID (shellin ppid) | vakaa koko session | Löytyy ancestor-walkilla; kierrätysriski → pid+starttime |
 | `TERM_SESSION_ID` / `ITERM_SESSION_ID` | uuid per terminaali-tabi | Vakaa ihmisen terminaalissa |
@@ -152,35 +152,57 @@ Mitattu Claude Coden Bash-työkalun sisällä (2026-07-13, CC 2.1.207, macOS):
 Johtopäätös: täydellinen, muistivapaa identiteetti on saatavilla ympäristöstä.
 v1 katsoi väärää signaalia (shell-PID) oikean (env / ancestor-prosessi) sijaan.
 
+### 2.1 Subagentti-identiteetti: ympäristö ei riitä (2026-08-09, CC 2.1.226)
+
+Uusintamittaus: kaksi rinnakkaista subagenttia dumppasivat ympäristönsä, ja
+tuloste oli **tavu tavulta identtinen** - sama `CLAUDE_CODE_SESSION_ID`, sama
+`CLAUDE_PID`, sama ancestor-prosessi, sama `transcript_path`. Bash-kutsun
+sisältä subagentteja ei voi erottaa millään signaalilla. Osan 2 johtopäätös
+pätee siis vain session tarkkuudella, ei agentin.
+
+Tunniste on olemassa, mutta vain harnessilla: **PreToolUse-hookin payload**
+sisältää kentän `agent_id` (+ `agent_type`) subagentin työkalukutsuissa ja
+jättää ne pois pääsession kutsuista. Mitattu samalla ajolla:
+
+| Kutsuja | `agent_id` payloadissa |
+|---|---|
+| Pääsessio | puuttuu |
+| Subagentti | `a7749ec14e0012632` |
+| Hook-agentti (esim. Stop-hook) | `hook-agent-<uuid>` |
+
+Tästä seuraa ketjun kohta 2 (`WEB2_AGENT`) ja `hooks/hooks.json`: hook lukee
+`agent_id`:n ja kirjoittaa sen komentoon, jolloin identiteetti on jälleen
+kokonaan ympäristöstä johdettu - kutsujan ei tarvitse muistaa mitään.
+
 ---
 
 ## Osa 3: Suunnitteluperiaatteet
 
-**P0 — Solipsismi.** Jokainen kutsuja elää maailmassa jossa on tasan yksi
-selain: sen oma. Agenttipinnassa ei ole session-käsitettä — ei nimiä, ei
+**P0 - Solipsismi.** Jokainen kutsuja elää maailmassa jossa on tasan yksi
+selain: sen oma. Agenttipinnassa ei ole session-käsitettä - ei nimiä, ei
 listausta, ei elinkaarta. Muiden selainten olemassaolo ei näy komennoissa,
 virheviesteissä eikä helpissä. Mitä agentti ei näe, sitä se ei voi sotkea.
 
-**P1 — Identiteetti johdetaan, ei muisteta.** Omistajuus resolvautuu
+**P1 - Identiteetti johdetaan, ei muisteta.** Omistajuus resolvautuu
 automaattisesti ympäristöstä jokaisella kutsulla, deterministisesti.
 
-**P2 — Nolla elinkaarikomentoja.** Kontti luodaan laiskasti ensimmäisellä
+**P2 - Nolla elinkaarikomentoja.** Kontti luodaan laiskasti ensimmäisellä
 komennolla, herätetään henkiin idle-tapon jälkeen, siivoutuu itsestään.
 
-**P3 — Räjähdyssäde = oma maailma.** Mikään agentin ajettavissa oleva komento
+**P3 - Räjähdyssäde = oma maailma.** Mikään agentin ajettavissa oleva komento
 ei koske toisen omistajan selaimeen. Globaalit operaatiot ovat admin-pinnassa,
 joka kieltäytyy toimimasta agenttiympäristössä.
 
-**P4 — Kone suojaa itsensä, ei agentti.** Timeoutit, TTL:t, muisti/CPU-rajat ja
+**P4 - Kone suojaa itsensä, ei agentti.** Timeoutit, TTL:t, muisti/CPU-rajat ja
 sessiokatto ovat infran vastuulla.
 
-**P5 — Jokainen komento groundaa.** Mutation jälkeen tulosteessa on aina
-`url — "title"` -rivi. Virheet ovat yksirivisiä ja preskriptiivisiä.
+**P5 - Jokainen komento groundaa.** Mutation jälkeen tulosteessa on aina
+`url - "title"` -rivi. Virheet ovat yksirivisiä ja preskriptiivisiä.
 
-**P6 — Rinnakkaisuus oman session sisällä on turvallista.** Saman omistajan
+**P6 - Rinnakkaisuus oman session sisällä on turvallista.** Saman omistajan
 rinnakkaiset komennot serialisoidaan lukolla.
 
-**P7 — Rinnakkaiselo v1:n kanssa on täydellistä.** Kaikki jaetut nimiavaruudet
+**P7 - Rinnakkaiselo v1:n kanssa on täydellistä.** Kaikki jaetut nimiavaruudet
 (PATH, env, docker-nimet/labelit/imaget, portit) käyttävät `web2`/`WEB2`-
 tunnisteita. Kumpikaan ei näe eikä riko toista.
 
@@ -196,7 +218,7 @@ Puhdas funktio, testattavissa ilman Dockeria. Riippuvuudet injektoidaan:
 // cmd/web2/identity.go
 type OwnerKind string
 const (
-    KindNamed OwnerKind = "named" // WEB2_SESSION — opt-in, ihmiset/CI/testit
+    KindNamed OwnerKind = "named" // WEB2_SESSION - opt-in, ihmiset/CI/testit
     KindAgent OwnerKind = "agent" // agenttiharnessin sessio-uuid envistä
     KindProc  OwnerKind = "proc"  // ancestor-prosessi
     KindTerm  OwnerKind = "term"  // terminaalisession uuid
@@ -221,12 +243,12 @@ func ResolveOwner(getenv func(string) string, tree ProcTree) Owner
 func (o Owner) ContainerName() string // "web2-" + hex(sha256(Key))[:12]
 ```
 
-Resoluutioketju — ensimmäinen osuma voittaa:
+Resoluutioketju - ensimmäinen osuma voittaa:
 
 ```
 1. WEB2_SESSION               → {Key: "named:"+val,  Kind: named}
 2. CLAUDE_CODE_SESSION_ID     → {Key: "cc:"+val,     Kind: agent}
-3. laajennustaulu muille harnesseille (vakiotaulukko, aluksi tyhjä —
+3. laajennustaulu muille harnesseille (vakiotaulukko, aluksi tyhjä -
    lisäys on yksi rivi: envin nimi → key-prefix)
 4. ancestor-walk (max 15 tasoa, ppid-syklivahti):
    lähin esi-isä jonka komennon basename ∈ {"claude","codex","cursor",
@@ -241,12 +263,12 @@ Toteutushuomiot:
 
 - `ProcTree`-tuotantototeutus shellaa `ps -p <pid> -o ppid=,lstart=,comm=`
   (toimii macOS + Linux; Linuxilla saa vaihtoehtoisesti lukea `/proc`).
-  `StartTime` = `lstart`-kentän raakateksti — sitä ei parsita, vain verrataan.
+  `StartTime` = `lstart`-kentän raakateksti - sitä ei parsita, vain verrataan.
 - Myös kohdassa 2 (agent) tallennetaan *luontihetkellä* löytynyt
   agentti-ancestorin pid+starttime kontin labeliin reaperia varten (4.4),
   mutta se ei ole osa Keytä (sama Claude-sessio voi jatkua eri prosessissa
   resumen jälkeen).
-- v1:n `WEB_SESSION`-muuttujaa **ei lueta** — se kuuluu v1:lle (P7).
+- v1:n `WEB_SESSION`-muuttujaa **ei lueta** - se kuuluu v1:lle (P7).
 - Ketjun järjestys on sopimus: yksikkötestit lukitsevat sen (Osa 8).
 
 ### 4.2 Kontti: nimeäminen, labelit, luonti
@@ -279,12 +301,12 @@ docker run -d --name <nimi> \
 - **CDP-porttia (9222) ei julkaista hostille** (v1 julkaisi readiness-pollausta
   varten). Readiness todetaan `docker exec`illä (4.3). Pienempi pinta,
   vähemmän törmäyksiä. Kontin sisäinen socat-tunneli poistuu entrypointista.
-- **Portit — oma alue, ei leikkaa v1:n kanssa** (v1: 20000–29999):
+- **Portit - oma alue, ei leikkaa v1:n kanssa** (v1: 20000-29999):
   `slot = fnv32a(containerName) % 4000`; `vnc = 31000 + slot*2`,
-  `novnc = vnc + 1` → alue 31000–38999. Deterministinen, ei tilaa hostilla.
+  `novnc = vnc + 1` → alue 31000-38999. Deterministinen, ei tilaa hostilla.
 - Dev-mode tunnistus kuten v1 (`isWeb2ProjectRoot`: markkerit
   `docker/Dockerfile` + `cmd/web2/main.go` + `src/cli.ts`;
-  `WEB2_PROJECT_ROOT` ylikirjoittaa) — markkerit eivät osu v1-repoon.
+  `WEB2_PROJECT_ROOT` ylikirjoittaa) - markkerit eivät osu v1-repoon.
 - Sessiokatto ennen luontia: `docker ps --filter label=web2=true` -määrä ≥
   `WEB2_MAX_SESSIONS` (oletus 8) → virhe E7 (4.8), **ei koskaan auto-evictiä**.
 
@@ -295,7 +317,7 @@ ResolveOwner → ctr = owner.ContainerName()
 ├─ kontti ajossa           → docker exec (wrapper touchaa heartbeatin)
 ├─ kontti exited           → docker rm; jatka kuten "ei olemassa"
 └─ ei olemassa             → sessiokaton tarkistus → docker run → readiness
-                             → stderr: "note: browser (re)started — page state was reset"
+                             → stderr: "note: browser (re)started - page state was reset"
                              → docker exec
 ```
 
@@ -308,7 +330,7 @@ ResolveOwner → ctr = owner.ContainerName()
   `WEB2_TAB_ID` → kontin `WEB_TAB_ID`), lisäksi `-e WEB_NO_LOCK=1`
   lukituksesta vapautetuille komennoille (4.5).
 
-### 4.4 Tappaminen — kolme kerrosta
+### 4.4 Tappaminen - kolme kerrosta
 
 1. **Idle-watchdog kontissa** (entrypoint): jokainen exec touchaa
    `/state/.web-heartbeat` (wrapper, 4.5). Watchdog-luuppi 30 s välein: jos
@@ -320,7 +342,7 @@ ResolveOwner → ctr = owner.ContainerName()
    oletus 14400 s = 4 h) → kill chrome. Vuotanut agenttilooppi ei voi pitää
    selainta ikuisesti.
 3. **Host-reaper** (`reaper.go`, ajetaan jokaisen `web2`-kutsun alussa,
-   best-effort, ei saa hidastaa komentoa — kova aikaraja ~500 ms):
+   best-effort, ei saa hidastaa komentoa - kova aikaraja ~500 ms):
 
 ```
 for ctr in docker ps -a --filter label=web2=true:
@@ -328,14 +350,14 @@ for ctr in docker ps -a --filter label=web2=true:
     elif ctr.kind == "proc":
         p, ok := tree.Lookup(ctr.pid)
         if !ok || p.StartTime != ctr.starttime:  docker rm -f ctr
-    # kind agent/term/tty/uid/named: EI reapata hostilta —
+    # kind agent/subagent/term/tty/uid/named: EI reapata hostilta -
     # uuid:n elossaoloa ei voi todeta; idle-timeout + TTL hoitavat.
 ```
 
 v1:n virhe oli reapata aggressiivisesti signaalilla joka ei todista mitään.
 Claude-session resume päivien päästä: sama uuid palaa, kontti on kuollut
 idle-timeoutiin → lazy start luo uuden. Toimii itsestään. Reaper suodattaa
-**vain** `web2=true`-labelilla — v1:n kontteihin ei kosketa (P7).
+**vain** `web2=true`-labelilla - v1:n kontteihin ei kosketa (P7).
 
 ### 4.5 Kontin sisäinen wrapper ja lukitus
 
@@ -353,23 +375,25 @@ if [ -f /app/src/cli.ts ]; then exec /app/node_modules/.bin/tsx /app/src/cli.ts 
 else exec node /app/dist/src/cli.js "$@"; fi
 ```
 
-- Lukko serialisoi saman omistajan rinnakkaiset komennot (emon subagentit
-  jakavat selaimen — todennettu, Osa 2 — ja se on haluttua: orkestroija näkee
-  mitä subagentti teki).
+- Lukko serialisoi saman omistajan rinnakkaiset komennot. Se ei enää ole
+  subagenttien rinnakkaisuuden ratkaisu: lukko estää kilpajuoksun, mutta ei
+  sitä että subagentti B navigoi pois sivulta jolla A oli. Subagentit saavat
+  oman omistajuutensa hookin kautta (Osa 2.1); lukko kattaa sen jälkeen vain
+  saman agentin omat rinnakkaiset kutsut.
 - Lukituksesta vapautetut komennot (Go-puoli asettaa `WEB_NO_LOCK=1`):
   `record *`, `page tail` (pitkäkestoisia, eivät kilpaile tab-tilasta).
   `crawl` **pitää** lukon: rinnakkainen kutsu saa 30 s jälkeen virheen E5
-  ("browser busy") — oikea signaali, ei race.
+  ("browser busy") - oikea signaali, ei race.
 - `WEB2_TAB_ID` (hostilla) säilyy advanced-mekanismina (ei dokumentoida
   skillissä): rinnakkainen tab-kohdistus yhden selaimen sisällä.
 - Kontin sisäiset env- ja tiedostonimet (`WEB_STATE_DIR`, `WEB_TAB_ID`,
-  `/state/.web-*`) säilyttävät v1:n nimet, jotta `src/` kopioituu koskematta —
+  `/state/.web-*`) säilyttävät v1:n nimet, jotta `src/` kopioituu koskematta -
   kontin sisällä ei ole rinnakkaiselo-ongelmaa (P7 koskee vain hostin jaettuja
   nimiavaruuksia). Go-binääri mappaa `WEB2_*` → kontin `WEB_*`.
 
 ### 4.6 Komentopinta
 
-**Agenttipinta** — v1:n selainkomennot sellaisenaan, session-komennot poistettu:
+**Agenttipinta** - v1:n selainkomennot sellaisenaan, session-komennot poistettu:
 
 ```
 web2 go <url> [--wait load|idle|commit]    web2 do click <sel> [--text|--right|--double|--force]
@@ -389,20 +413,20 @@ web2 tab list|create|select|next|previous|close
 web2 cookies list [--json] | clear         web2 record save|stop|start|dashcam
 
 web2 status     # oma selain: url, title, viewport, tabs, uptime, idle/ttl jäljellä
-web2 reset      # tuhoa oma kontti + käynnistä puhdas tilalle (2–5 s)
+web2 reset      # tuhoa oma kontti + käynnistä puhdas tilalle (2-5 s)
 web2 open vnc|novnc   # avaa OMAN selaimen katselu
 web2 doctor           # docker-tarkistukset; ei paljasta muiden sessioita
 ```
 
 - **Ei ole**: `web2 session <mikään>`, `--name`, `destroy`, `list`, `ensure`.
 - `web2 status` ilman ajossa olevaa selainta: tulostaa
-  `no browser running — one starts automatically on your first command`,
+  `no browser running - one starts automatically on your first command`,
   exit 0, **ei käynnistä konttia** (ainoa komento joka ei ensurea).
 - `web2 reset` = `docker rm -f` oma kontti + luo uusi + odota ready. Takaa
   100 % puhtaan tilan (cookiet, storage, tabit, dashcam) yksinkertaisimmalla
   mahdollisella mekanismilla. Ilman olemassaolevaa konttia: luo puhtaan.
 
-**Admin-pinta** — ihmiselle; ei mainita skillissä eikä päähelpissä
+**Admin-pinta** - ihmiselle; ei mainita skillissä eikä päähelpissä
 (`web2 --help` listaa vain rivin `admin  (human only)`):
 
 ```
@@ -422,10 +446,10 @@ eksplisiittisesti (`WEB2_ADMIN=1 web2 admin destroy --all`).
 - **Data → stdout, meta → stderr.** Stdout pysyy pipetettävänä.
 - Jokainen sivun tilaa muuttava komento (`go`, `reload`, `do *`, `tab select`
   jne.) päättää stderr:iin grounding-rivin:
-  `→ https://example.com/login — "Sign in"`
+  `→ https://example.com/login - "Sign in"`
 - `--json` kaikkiin komentoihin. Skeema:
   `{"ok":true,"url":"...","title":"...","data":<komentokohtainen>}` /
-  `{"ok":false,"error":"<koodi>","message":"...","hint":"..."}` — yksi objekti
+  `{"ok":false,"error":"<koodi>","message":"...","hint":"..."}` - yksi objekti
   stdoutiin, ei mitään muuta stdoutiin.
 - Restart-note (4.3) stderr:iin ennen komennon tulostetta.
 - Ei interaktiivisia promptteja, ei spinnereitä; ANSI vain kun stdout on tty.
@@ -438,7 +462,7 @@ eksplisiittisesti (`WEB2_ADMIN=1 web2 admin destroy --all`).
 |---|---|---|---|
 | E1 | 1 | `element not found: <sel> (waited 5s)` | Playwright-virheet, komentokohtaiset |
 | E2 | 2 | `usage: web2 do click <selector> [...]` | argumenttivirhe |
-| E5 | 5 | `browser busy — another command is running (waited 30s); retry shortly` | flock-timeout |
+| E5 | 5 | `browser busy - another command is running (waited 30s); retry shortly` | flock-timeout |
 | E6 | 3 | `browser failed to start (30s); run 'web2 doctor'` + logihäntä | readiness-timeout |
 | E7 | 3 | `too many browsers on this host (<N>); ask the user to free capacity` | sessiokatto |
 | E8 | 3 | `admin commands are human-only; the user can run this, or set WEB2_ADMIN=1 to authorize you` | agent-gate |
@@ -466,20 +490,20 @@ henkiin (idle-watchdog hoitaa sen aikanaan).
 
 | Env | Oletus | Merkitys |
 |---|---|---|
-| `WEB2_SESSION` | – | Eksplisiittinen omistajanimi (ihmiset/CI/testit; ketjun kohta 1) |
-| `WEB2_ADMIN` | – | `1` sallii admin-komennot agenttiympäristössä |
+| `WEB2_SESSION` | - | Eksplisiittinen omistajanimi (ihmiset/CI/testit; ketjun kohta 1) |
+| `WEB2_ADMIN` | - | `1` sallii admin-komennot agenttiympäristössä |
 | `WEB2_IDLE_TIMEOUT` | 300 | s, kontin itsetuho ilman komentoja |
 | `WEB2_TTL` | 14400 | s, kontin maksimielinikä |
 | `WEB2_MAX_SESSIONS` | 8 | web2-konttien katto per host |
 | `WEB2_CMD_TIMEOUT` | 60 | s, per-komento |
 | `WEB2_IMAGE` | `web2:latest` | image-nimi |
-| `WEB2_DEBUG` | – | timestamp-lokit stderr:iin (välitetään konttiin `WEB_DEBUG`:na) |
-| `WEB2_TAB_ID` | – | advanced: tab-kohdistus (välitetään konttiin `WEB_TAB_ID`:nä) |
-| `WEB2_PROJECT_ROOT` | – | dev-mode juuren ylikirjoitus |
+| `WEB2_DEBUG` | - | timestamp-lokit stderr:iin (välitetään konttiin `WEB_DEBUG`:na) |
+| `WEB2_TAB_ID` | - | advanced: tab-kohdistus (välitetään konttiin `WEB_TAB_ID`:nä) |
+| `WEB2_PROJECT_ROOT` | - | dev-mode juuren ylikirjoitus |
 
 Host-binääri ei lue yhtään `WEB_*`-muuttujaa → v1:n envit eivät vaikuta
 web2:een millään tavalla (P7). Kontin sisäiset nimet (`WEB_STATE_DIR` jne.)
-ovat v1-perintöä ja kontin sisäisiä — ei törmäyspintaa.
+ovat v1-perintöä ja kontin sisäisiä - ei törmäyspintaa.
 
 ### 4.11 Skill
 
@@ -487,7 +511,7 @@ Yksi pääskill (`skills/go/SKILL.md`), sisältö = v1:n komennolistaus
 `web2`-nimellä **miinus** kaikki session-rivit. Ensimmäinen esimerkki:
 
 ```bash
-web2 go https://example.com     # ei esiehtoja — selain käynnistyy itsestään
+web2 go https://example.com     # ei esiehtoja - selain käynnistyy itsestään
 ```
 
 Skillissä ei esiinny sanaa "session". `read`/`crawl`/`screenshot`-skillit
@@ -519,7 +543,7 @@ web2/
   docker/
     Dockerfile       # v1-pohja; wrapper /usr/local/bin/web2 (4.5); flock mukana
     entrypoint.sh    # v1-pohja; + TTL-watchdog; − socat CDP-tunneli
-  skills/            # go, read, crawl, screenshot — 4.11
+  skills/            # go, read, crawl, screenshot - 4.11
   e2e/               # v1:n runner + testit; uudet eristys/elinkaaritestit (Osa 8.2)
   package.json, tsconfig.json, CLAUDE.md
 ```
@@ -541,35 +565,35 @@ Go-binäärin nimi on `web2` (PATH-rinnakkaiselo v1:n `web`-binäärin kanssa, P
 
 ## Osa 6: Toteutusjärjestys (TDD, red-green-refactor joka askeleessa)
 
-**M0 — Runko.** Kopioi Osa 5:n mukaiset v1-tiedostot. `npm test` vihreä
+**M0 - Runko.** Kopioi Osa 5:n mukaiset v1-tiedostot. `npm test` vihreä
 (< 3 s), `docker build -t web2:latest` onnistuu, kontti käynnistyy käsin.
 
-**M1 — Identiteetti.** `identity_test.go` ensin (Osa 8.1:n taulukko) →
+**M1 - Identiteetti.** `identity_test.go` ensin (Osa 8.1:n taulukko) →
 punainen → toteuta `ResolveOwner` + ps-pohjainen `ProcTree`. Hyväksyntä:
 kaikki taulukkotestit vihreitä ilman Dockeria.
 
-**M2 — Elinkaari.** Testi ensin: muistittomuus-e2e (Osa 8.2 T2). Toteuta
+**M2 - Elinkaari.** Testi ensin: muistittomuus-e2e (Osa 8.2 T2). Toteuta
 `lifecycle.go` + `exec.go` (ensure-polku, readiness, restart-note, timeout).
 Hyväksyntä: T2 vihreä; `web2 go example.com` toimii tyhjästä ilman mitään
 esikomentoja.
 
-**M3 — Eristys.** Testi ensin: T1 (kaksi identiteettiä). Varmista ettei
+**M3 - Eristys.** Testi ensin: T1 (kaksi identiteettiä). Varmista ettei
 mihinkään jäänyt fallback-polkua (grep: `resolveContainer`, `web-default`,
 `web2-default`). Hyväksyntä: T1 vihreä.
 
-**M4 — Tappaminen.** Entrypointin TTL-watchdog + `reaper.go`. Testit T3–T5
+**M4 - Tappaminen.** Entrypointin TTL-watchdog + `reaper.go`. Testit T3 - T5
 (nopeutetut timeoutit envillä: `WEB2_IDLE_TIMEOUT=2` jne.). Huom. e2e-budjetti:
 elinkaaritestit `--docker`-lipun taakse kuten v1:n docker-testit.
 
-**M5 — Lukitus.** Wrapper + flock + `WEB_NO_LOCK`. Testi T6.
+**M5 - Lukitus.** Wrapper + flock + `WEB_NO_LOCK`. Testi T6.
 
-**M6 — Admin + gate.** `admin.go`. Testit T7–T8.
+**M6 - Admin + gate.** `admin.go`. Testit T7 - T8.
 
-**M7 — Output-kontrakti + skillit.** Grounding-rivi, `--json`-skeema,
+**M7 - Output-kontrakti + skillit.** Grounding-rivi, `--json`-skeema,
 virhekatalogin viestit, skillien kirjoitus, `web2 status`/`reset`. Testit
-T9–T11.
+T9 - T11.
 
-**M8 — Paketointi.** Embedded bundle, `web2 doctor`, README, CLAUDE.md
+**M8 - Paketointi.** Embedded bundle, `web2 doctor`, README, CLAUDE.md
 (testibudjetit ja TDD-sääntö v1:stä sellaisenaan).
 
 Jokainen milestone on itsenäisesti mergettävä; M2:n jälkeen työkalu on jo
@@ -586,7 +610,7 @@ Chromiumin mukana.
 
 Muutokset:
 
-1. **Poista** socat-CDP-tunneli (v1:n rivi `socat TCP-LISTEN:9222,...`) — CDP
+1. **Poista** socat-CDP-tunneli (v1:n rivi `socat TCP-LISTEN:9222,...`) - CDP
    jää vain kontin sisäiseksi (127.0.0.1:19222).
 2. **Watchdog-luuppi laajenee** (30 s välein):
    ```sh
@@ -638,7 +662,7 @@ Muutokset:
 | T11 | status/reset | `web2 status` ilman konttia ei käynnistä sitä; `reset` → cookiet poissa |
 
 Budjetit v1:stä: `npm test` < 3 s; nopea e2e < 10 s; Docker-elinkaaritestit
-(T1–T8, T10–T11) `--docker`-ajossa omalla budjetillaan (< 120 s). Ei
+(T1 - T8, T10 - T11) `--docker`-ajossa omalla budjetillaan (< 120 s). Ei
 `sleep > 2` nopeissa testeissä.
 
 ### 8.3 Regressiosuojat
@@ -656,15 +680,15 @@ Budjetit v1:stä: `npm test` < 3 s; nopea e2e < 10 s; Docker-elinkaaritestit
 
 | # | Kysymys | Päätös |
 |---|---|---|
-| K1 | Subagentit jakavat emon selaimen? | Kyllä (todennettu, haluttu). Lukko (4.5) tekee siitä turvallista. Jos CC joskus antaa subagentti-tason ID:n, se lisätään ketjun kohdaksi 2b. |
+| K1 | Subagentit jakavat emon selaimen? | ~~Kyllä (todennettu, haluttu)~~ **Kumottu 2026-08-09.** Käytännössä ne törmäilivät: lukko esti racen mutta ei sitä että subagentti navigoi pois toisen sivulta. CC 2.1.226 antaa subagentti-tason ID:n hook-payloadissa (Osa 2.1), joten se lisättiin ketjun kohdaksi 2 (`WEB2_AGENT`). Jokainen subagentti saa nyt oman selaimensa; ilman hookia degradoituu vanhaan jaettuun (ei koskaan toisen omistajan) selaimeen. |
 | K2 | Muut harnessit? | Ancestor-walk + term + tty kattaa; env-taulu laajennettavissa rivillä. |
-| K3 | `CLAUDE_CODE_SESSION_ID` ei-dokumentoitu — jos katoaa? | Ketju degradoituu kohtaan 4 (proc) joka toimii CC:lle myös (claude-prosessi on aina ancestor). Ei kova riippuvuus. |
+| K3 | `CLAUDE_CODE_SESSION_ID` ei-dokumentoitu - jos katoaa? | Ketju degradoituu kohtaan 4 (proc) joka toimii CC:lle myös (claude-prosessi on aina ancestor). Ei kova riippuvuus. |
 | K4 | Monta Chromiumia = raskas | Kovat rajat: 2 GB/2 CPU per kontti, katto 8, idle 5 min, TTL 4 h. Ei auto-evictiä koskaan. |
 | K5 | Sama agentti eri hakemistoissa | Identiteetti on sessio-, ei cwd-pohjainen: yksi Claude = yksi selain. Tietoinen valinta (P0). |
 | K6 | v1:n `session save/load` (cookiet+storage tiedostoon) | Jätetään M8:n jälkeiseksi; jos toteutetaan, nimi on `web2 state save/load` (ei "session"). |
 | K7 | `web ai` (sisäkkäinen Claude) | Ei web2:n ytimeen; agentti on jo se AI. Voidaan lisätä myöhemmin ihmispintaan. |
-| K8 | Nimeäminen ja rinnakkaiselo | **Kaikki jaetut nimiavaruudet web2-tunnisteilla**: binääri `web2`, host-envit `WEB2_*`, image `web2:latest`, kontti-prefix `web2-`, label `web2=true`, porttialue 31000–38999 (v1: 20000–29999). Kontin *sisäiset* nimet säilyttävät v1:n `WEB_*`-muodot jotta `src/` kopioituu koskematta — ei törmäyspintaa kontin sisällä. |
-| K9 | Toteutuskielet | **Go (host) + TypeScript (kontti)** — Osa 0. Rust hylätty: ei virallista Playwrightia (aria-snapshot on ekstraktioytimen edellytys), muistiturvaetu olematon (turvaraja on Docker; Go/TS ovat myös muistiturvallisia), hitain TDD-silmukka. Koodin kirjoittaa ja lukee agentti → optimoidaan mallin tuottavuudelle ja työkaluketjun nopeudelle. |
+| K8 | Nimeäminen ja rinnakkaiselo | **Kaikki jaetut nimiavaruudet web2-tunnisteilla**: binääri `web2`, host-envit `WEB2_*`, image `web2:latest`, kontti-prefix `web2-`, label `web2=true`, porttialue 31000-38999 (v1: 20000-29999). Kontin *sisäiset* nimet säilyttävät v1:n `WEB_*`-muodot jotta `src/` kopioituu koskematta - ei törmäyspintaa kontin sisällä. |
+| K9 | Toteutuskielet | **Go (host) + TypeScript (kontti)** - Osa 0. Rust hylätty: ei virallista Playwrightia (aria-snapshot on ekstraktioytimen edellytys), muistiturvaetu olematon (turvaraja on Docker; Go/TS ovat myös muistiturvallisia), hitain TDD-silmukka. Koodin kirjoittaa ja lukee agentti → optimoidaan mallin tuottavuudelle ja työkaluketjun nopeudelle. |
 
 ---
 
@@ -673,7 +697,8 @@ Budjetit v1:stä: `npm test` < 3 s; nopea e2e < 10 s; Docker-elinkaaritestit
 v1 kaatui siihen, että identiteetti johdettiin shell-PID:stä, joka vaihtuu joka
 Bash-kutsulla, ja fallback ohjasi komennot muiden sessioihin. web2:ssa
 identiteetti johdetaan vakaista ympäristösignaaleista
-(`CLAUDE_CODE_SESSION_ID` ensisijaisena — todennettu, subagentit perivät sen),
+(`CLAUDE_CODE_SESSION_ID` ensisijaisena, ja sen alle subagenttikohtainen
+`WEB2_AGENT` jonka PreToolUse-hook injektoi - Osa 2.1),
 agenttipinnasta poistetaan session-käsite kokonaan (yksi näkymätön oma selain,
 lazy start, restart-note, itsetuho idlellä ja TTL:llä), saman omistajan
 rinnakkaisuus serialisoidaan flockilla, ja kaikki mikä voi koskea muihin

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -93,6 +94,31 @@ func TestRegressionGuards(t *testing.T) {
 	for _, line := range strings.Split(src, "\n") {
 		if strings.Contains(line, `os.Getenv("WEB_`) {
 			t.Errorf("host binary reads a v1 WEB_* env var: %s", strings.TrimSpace(line))
+		}
+	}
+}
+
+// A command that exists but is not in usage() is a command agents never
+// find: usage() is the only surface they read. Keep them in sync.
+func TestUsageDocumentsEveryContainerCommand(t *testing.T) {
+	usage := usageText(t)
+	for _, cmd := range containerCommands() {
+		// Anchored to a listing line, so "network" is not satisfied by the
+		// word "network-idle" appearing in some other command's options.
+		listed := regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(cmd) + `\b`)
+		if !listed.MatchString(usage) {
+			t.Errorf("usage() does not list container command %q", cmd)
+		}
+	}
+}
+
+// Options that exist only in src/cli.ts are invisible to agents too. These
+// are the ones e2e covers but usage() used to omit.
+func TestUsageDocumentsTestedOptions(t *testing.T) {
+	usage := usageText(t)
+	for _, opt := range []string{"--double", "--right", "--clear", "hidden:"} {
+		if !strings.Contains(usage, opt) {
+			t.Errorf("usage() does not mention %q", opt)
 		}
 	}
 }

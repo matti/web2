@@ -20,21 +20,42 @@ cmd/web2/                            Node.js + Playwright (compiled JS)
   identity.go   ResolveOwner:          Xvfb + Chromium + IDCAC extension
                 env → ancestor →       x11vnc + noVNC (always on)
                 term → tty → uid       dashcam (rolling 5min ffmpeg buffer)
-  lifecycle.go  lazy ensure, ports,    /usr/local/bin/web2 wrapper:
-                cap, readiness           heartbeat + flock serialization
-  exec.go       timeout, lock-exempt  entrypoint.sh watchdog:
-  reaper.go     label-scoped GC         idle timeout + hard TTL
+  hook.go       PreToolUse: subagent  /usr/local/bin/web2 wrapper:
+  lifecycle.go  lazy ensure, ports,      heartbeat + flock serialization
+                cap, readiness        entrypoint.sh watchdog:
+  exec.go       timeout, lock-exempt     idle timeout + hard TTL
+  reaper.go     label-scoped GC
   admin.go      human-only surface
   <browser cmd> ──docker exec──>     src/cli.ts + all commands
 ```
 
-Owner identity chain (first match wins): `WEB2_SESSION` → agent session env
+Owner identity chain (first match wins): `WEB2_SESSION` → `WEB2_AGENT`
+(per-subagent id, injected by the hook below) → agent session env
 (`CLAUDE_CODE_SESSION_ID`) → nearest agent ancestor process (pid+starttime) →
 terminal session id → tty → uid. Container name = `web2-<sha256(key)[:12]>`.
 
+### Subagent isolation (hooks/hooks.json + hook.go)
+
+- Subagents of one Claude Code session are **indistinguishable from the
+  environment**: same `CLAUDE_CODE_SESSION_ID`, same `CLAUDE_PID`, same agent
+  ancestor (measured on CC 2.1.226). Without help they all share one browser
+  and overwrite each other's pages.
+- The harness knows who is calling and puts `agent_id` in the **PreToolUse**
+  payload - present for subagent tool calls, absent for the main session.
+- The plugin ships a PreToolUse/Bash hook that runs `web2 hook pretooluse`.
+  It rewrites the command to `export WEB2_AGENT=<agent_id>; <original>` and
+  `ResolveOwner` picks that up. It never returns a `permissionDecision`.
+- Left untouched: the main session, non-Bash tools, commands that do not run
+  `web2`, and callers who already set `WEB2_SESSION`/`WEB2_AGENT`.
+- Without the hook the chain degrades to the shared browser - never to
+  another owner's. `agent_id` is interpolated into a shell command, so
+  anything outside `[A-Za-z0-9_-]{1,64}` is refused, not escaped.
+- The hook runs on **every Bash tool call**: `main()` dispatches it before
+  `maybeRebuild()` and `reapOrphans()` so it never touches docker.
+
 Coexistence with v1 (`web`): different binary name, `WEB2_*` host env prefix,
 `web2:latest` image, `web2-` container prefix, `web2=true` label, port range
-31000–38999. The host binary never reads bare `WEB_*` vars (enforced by test).
+31000-38999. The host binary never reads bare `WEB_*` vars (enforced by test).
 Inside the container v1's `WEB_*` names are kept so `src/` stays portable.
 
 ### Key rules
@@ -88,7 +109,8 @@ npm test                # TS unit tests (< 3s)
 ./e2e/run.sh crawl interact      # slow rate-limited groups (opt-in)
 ./e2e/run.sh --docker   # docker suite: isolation T1, memorylessness T2,
                         # idle/TTL T3, lock T6, admin gate T7, cap T10,
-                        # status/reset T11 (budget ~120s)
+                        # status/reset T11, lock release T12, subagent
+                        # isolation T13 (budget ~120s)
 ```
 
 ### Performance budgets (enforced)
@@ -96,6 +118,13 @@ npm test                # TS unit tests (< 3s)
 - Code timeouts: max 2000ms in tests. Bash tool: max 30s. `npm test` < 3s.
 - Fast e2e group < 15s. E2e uses compiled JS (`node dist/`), not tsx.
 - New e2e scripts must be independent (own Chromium, parallel).
+- **Never launch anything through `npx`** in a test path: it adds ~400ms of
+  package resolution per call, and these paths start a dozen processes.
+  e2e scripts run on plain `node` (24+ strips types natively); unit tests
+  still need `tsx` because they import with `.js` specifiers, which native
+  node does not resolve to `.ts`.
+- A test that sleeps a fixed second is a defect: make the interval a
+  parameter (see `RateLimiter`, `dismissCookieBanner`) and pass a small one.
 
 ### Regression guards (cmd/web2/main_test.go - keep passing)
 
@@ -105,6 +134,10 @@ npm test                # TS unit tests (< 3s)
 - Host binary must not read any bare `WEB_*` env var.
 
 ## Gotchas (learned the hard way - do not reintroduce)
+
+- Two subagents of one session produce **byte-identical env dumps**. Never
+  try to tell them apart from inside a Bash call (env, `$$`, ancestor walk,
+  transcript path - all shared); the id only exists in the hook payload.
 
 - `docker ps --format` needs `{{.Label "x"}}`; `{{index .Labels "x"}}` only
   works in `docker inspect` (ps .Labels is a string).

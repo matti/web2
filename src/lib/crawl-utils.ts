@@ -106,15 +106,19 @@ export function checkPathVariant(
 export class RateLimiter {
   private timestamps: number[] = [];
   private rps: number;
+  private windowMs: number;
 
-  constructor(rps: number) {
+  // windowMs is configurable so tests can exercise the blocking path without
+  // sleeping a real second per assertion.
+  constructor(rps: number, windowMs = 1000) {
     this.rps = rps;
+    this.windowMs = windowMs;
   }
 
   async wait(): Promise<void> {
     if (this.rps <= 0) return; // unlimited
     const now = Date.now();
-    const window = 1000; // 1 second window
+    const window = this.windowMs;
     // Prune old timestamps
     this.timestamps = this.timestamps.filter((t) => now - t < window);
     if (this.timestamps.length >= this.rps) {

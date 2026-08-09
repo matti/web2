@@ -22,8 +22,15 @@ export interface CliResult {
 }
 
 export function cli(...args: string[]): CliResult {
+  return cliWithEnv({}, ...args);
+}
+
+export function cliWithEnv(
+  envOverrides: Record<string, string>,
+  ...args: string[]
+): CliResult {
   const r = spawnSync("node", [cliJs, ...args], {
-    env,
+    env: { ...env, ...envOverrides },
     encoding: "utf-8",
     timeout: 10_000,
   });

@@ -56,12 +56,32 @@ func TestResolveOwner(t *testing.T) {
 			wantKind: KindNamed,
 		},
 		{
+			// U1b: explicit name also wins over the injected subagent id
+			name:     "U1b WEB2_SESSION wins over WEB2_AGENT",
+			env:      map[string]string{"WEB2_SESSION": "ci", "WEB2_AGENT": "a7749ec1"},
+			tree:     claudeTree(),
+			wantKey:  "named:ci",
+			wantKind: KindNamed,
+		},
+		{
 			// U2: agent session env
 			name:     "U2 CLAUDE_CODE_SESSION_ID",
 			env:      map[string]string{"CLAUDE_CODE_SESSION_ID": "83a6bc37-696d"},
 			tree:     claudeTree(),
 			wantKey:  "cc:83a6bc37-696d",
 			wantKind: KindAgent,
+		},
+		{
+			// U2b: subagents share the harness session id, so the per-agent id
+			// injected by the PreToolUse hook must outrank it - otherwise every
+			// subagent of one session lands in the same browser.
+			name: "U2b WEB2_AGENT wins over CLAUDE_CODE_SESSION_ID",
+			env: map[string]string{
+				"WEB2_AGENT": "a7749ec14e0012632", "CLAUDE_CODE_SESSION_ID": "83a6bc37-696d",
+			},
+			tree:     claudeTree(),
+			wantKey:  "agent:a7749ec14e0012632",
+			wantKind: KindSubagent,
 		},
 		{
 			// U3: ancestor walk finds claude at depth 2
@@ -161,6 +181,44 @@ func TestResolveOwnerAgentLivenessHint(t *testing.T) {
 	}
 	if o.PID != 80 || o.StartTime != "Mon Jul 13 09:58:20 2026" {
 		t.Errorf("liveness hint = (%d, %q), want claude ancestor", o.PID, o.StartTime)
+	}
+}
+
+// Subagent owners carry the same ancestor liveness hint as agent owners, so
+// admin can show who a browser belongs to.
+func TestResolveOwnerSubagentLivenessHint(t *testing.T) {
+	o := ResolveOwner(Environment{
+		Getenv: env(map[string]string{"WEB2_AGENT": "a7749ec1"}),
+		Tree:   claudeTree(), UID: 501,
+	})
+	if o.Kind != KindSubagent {
+		t.Fatalf("Kind = %q", o.Kind)
+	}
+	if o.PID != 80 || o.StartTime != "Mon Jul 13 09:58:20 2026" {
+		t.Errorf("liveness hint = (%d, %q), want claude ancestor", o.PID, o.StartTime)
+	}
+}
+
+// Two subagents of one session must never resolve to the same browser - this
+// is the whole point of the hook.
+func TestResolveOwnerSubagentsAreDistinct(t *testing.T) {
+	shared := "83a6bc37-696d"
+	a := ResolveOwner(Environment{Getenv: env(map[string]string{
+		"WEB2_AGENT": "aaa", "CLAUDE_CODE_SESSION_ID": shared,
+	}), Tree: claudeTree(), UID: 501})
+	b := ResolveOwner(Environment{Getenv: env(map[string]string{
+		"WEB2_AGENT": "bbb", "CLAUDE_CODE_SESSION_ID": shared,
+	}), Tree: claudeTree(), UID: 501})
+	parent := ResolveOwner(Environment{Getenv: env(map[string]string{
+		"CLAUDE_CODE_SESSION_ID": shared,
+	}), Tree: claudeTree(), UID: 501})
+
+	names := map[string]string{
+		a.ContainerName(): "subagent a", b.ContainerName(): "subagent b",
+		parent.ContainerName(): "parent",
+	}
+	if len(names) != 3 {
+		t.Errorf("expected 3 distinct browsers, got %d: %v", len(names), names)
 	}
 }
 

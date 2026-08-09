@@ -2,7 +2,7 @@
   "name": "web2",
   "description": "Agent-first browser automation for Claude Code — browse, read, screenshot, crawl, and interact with web pages. Fully isolated per agent.",
   "author": { "name": "mpa" },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "skills": [
     "./skills/go",
