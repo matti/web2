@@ -22,7 +22,7 @@ cmd/web2/                            Node.js + Playwright (compiled JS)
                 term → tty → uid       dashcam (rolling 5min ffmpeg buffer)
   hook.go       PreToolUse: subagent  /usr/local/bin/web2 wrapper:
   lifecycle.go  lazy ensure, ports,      heartbeat + flock serialization
-                cap, readiness        entrypoint.sh watchdog:
+                capacity, readiness   entrypoint.sh watchdog:
   exec.go       timeout, lock-exempt     idle timeout + hard TTL
   reaper.go     label-scoped GC
   admin.go      human-only surface
@@ -96,6 +96,12 @@ Host env variables:
   5. Value must be a non-negative integer. The host maps this to
   `WEB_LOCK_WAIT` for in-container consumption.
 - `WEB2_NO_REBUILD=1` disables dev-mode Go rebuilds.
+- `WEB2_MIN_FREE_MB=<mb>` is the free memory required in the Docker VM before
+  another browser starts (default 1024; `0` disables the check). Capacity is
+  memory-based, never a count of containers: the VM's memory is shared with
+  every other container on the machine, so counting only web2's own would
+  wave through browsers that do not fit. Read via `/proc/meminfo` from inside
+  a running browser, which reports the whole VM. Nothing is ever auto-evicted.
 
 ## Testing - TDD required (NON-NEGOTIABLE)
 
@@ -108,7 +114,7 @@ npm test                # TS unit tests (< 3s)
 ./e2e/run.sh            # fast host e2e group (budget 15s)
 ./e2e/run.sh crawl interact      # slow rate-limited groups (opt-in)
 ./e2e/run.sh --docker   # docker suite: isolation T1, memorylessness T2,
-                        # idle/TTL T3, lock T6, admin gate T7, cap T10,
+                        # idle/TTL T3, lock T6, admin gate T7, capacity T10,
                         # status/reset T11, lock release T12, subagent
                         # isolation T13 (budget ~120s)
 ```

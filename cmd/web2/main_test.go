@@ -90,6 +90,14 @@ func TestRegressionGuards(t *testing.T) {
 		}
 	}
 
+	// A cap on the number of browsers counts only web2's own containers while
+	// the scarce resource is memory shared with every other container in the
+	// Docker VM. Capacity is decided by free memory (capacity.go); the count
+	// must not come back. Quoted so capacity.go may still name it in prose.
+	if strings.Contains(src, `"WEB2_MAX_SESSIONS"`) {
+		t.Error("host binary reads WEB2_MAX_SESSIONS again: capacity is memory-based")
+	}
+
 	// No os.Getenv("WEB_...") without the WEB2_ prefix in host code.
 	for _, line := range strings.Split(src, "\n") {
 		if strings.Contains(line, `os.Getenv("WEB_`) {

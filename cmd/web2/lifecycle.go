@@ -23,28 +23,10 @@ func ensureContainer(o Owner) string {
 	// Remove a stopped leftover with the same name (idle/TTL killed).
 	dockerOutputSilent("rm", "-f", ctr)
 
-	checkSessionCap()
+	checkCapacity()
 	startContainer(o, ctr)
-	fmt.Fprintln(os.Stderr, "note: browser (re)started — page state was reset")
+	fmt.Fprintln(os.Stderr, "note: browser (re)started - page state was reset")
 	return ctr
-}
-
-// checkSessionCap refuses to create a browser beyond the host-wide cap.
-// Never auto-evicts: killing someone else's browser would break isolation.
-func checkSessionCap() {
-	cap := envInt("WEB2_MAX_SESSIONS", 8)
-	out, err := dockerOutputSilent("ps", "-q", "--filter", "label=web2=true")
-	if err != nil {
-		return // docker errors surface later with a better message
-	}
-	n := 0
-	if s := strings.TrimSpace(out); s != "" {
-		n = len(strings.Split(s, "\n"))
-	}
-	if n >= cap {
-		fmt.Fprintf(os.Stderr, "Error: too many browsers on this host (%d); ask the user to free capacity\n", cap)
-		os.Exit(exitInfra)
-	}
 }
 
 func startContainer(o Owner, ctr string) {

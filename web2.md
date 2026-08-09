@@ -10,7 +10,8 @@ jotka eivät saa nähdä eivätkä sotkea toistensa selaimia.**
    ilman elinkaarikomentoja: `web2 go <url>` on koko API.
 2. Täysi eristys omistajien välillä: agentti ei voi nähdä eikä koskea muiden
    selaimiin millään komennolla.
-3. Kone suojaa itsensä: idle-timeout, kova TTL, resurssirajat, sessiokatto.
+3. Kone suojaa itsensä: idle-timeout, kova TTL, resurssirajat,
+   muistipohjainen kapasiteettitarkistus.
 4. **Täysi rinnakkaiselo v1:n kanssa**: eri binäärinimi (`web2`), eri
    env-prefix (`WEB2_*`), eri image, eri kontti-prefix ja -label, eri
    porttialue. v1 ja v2 samalla koneella eivät näe toisiaan millään tasolla.
@@ -194,7 +195,7 @@ ei koske toisen omistajan selaimeen. Globaalit operaatiot ovat admin-pinnassa,
 joka kieltäytyy toimimasta agenttiympäristössä.
 
 **P4 - Kone suojaa itsensä, ei agentti.** Timeoutit, TTL:t, muisti/CPU-rajat ja
-sessiokatto ovat infran vastuulla.
+kapasiteettitarkistus ovat infran vastuulla.
 
 **P5 - Jokainen komento groundaa.** Mutation jälkeen tulosteessa on aina
 `url - "title"` -rivi. Virheet ovat yksirivisiä ja preskriptiivisiä.
@@ -308,7 +309,8 @@ docker run -d --name <nimi> \
   `docker/Dockerfile` + `cmd/web2/main.go` + `src/cli.ts`;
   `WEB2_PROJECT_ROOT` ylikirjoittaa) - markkerit eivät osu v1-repoon.
 - Sessiokatto ennen luontia: `docker ps --filter label=web2=true` -määrä ≥
-  `WEB2_MAX_SESSIONS` (oletus 8) → virhe E7 (4.8), **ei koskaan auto-evictiä**.
+  VM:n vapaa muisti < `WEB2_MIN_FREE_MB` (oletus 1024) → virhe E7 (4.8),
+  **ei koskaan auto-evictiä**.
 
 ### 4.3 Elinkaari: jokaisen komennon polku
 
@@ -464,7 +466,7 @@ eksplisiittisesti (`WEB2_ADMIN=1 web2 admin destroy --all`).
 | E2 | 2 | `usage: web2 do click <selector> [...]` | argumenttivirhe |
 | E5 | 5 | `browser busy - another command is running (waited 30s); retry shortly` | flock-timeout |
 | E6 | 3 | `browser failed to start (30s); run 'web2 doctor'` + logihäntä | readiness-timeout |
-| E7 | 3 | `too many browsers on this host (<N>); ask the user to free capacity` | sessiokatto |
+| E7 | 3 | `not enough memory for another browser (<N> MB available, <M> MB needed)` | kapasiteetti |
 | E8 | 3 | `admin commands are human-only; the user can run this, or set WEB2_ADMIN=1 to authorize you` | agent-gate |
 | E9 | 4 | `command timed out after <T>s` | per-komento timeout (4.9) |
 | E10 | 3 | `docker not available; run 'web2 doctor'` | docker puuttuu/ei käynnissä |
@@ -494,7 +496,7 @@ henkiin (idle-watchdog hoitaa sen aikanaan).
 | `WEB2_ADMIN` | - | `1` sallii admin-komennot agenttiympäristössä |
 | `WEB2_IDLE_TIMEOUT` | 300 | s, kontin itsetuho ilman komentoja |
 | `WEB2_TTL` | 14400 | s, kontin maksimielinikä |
-| `WEB2_MAX_SESSIONS` | 8 | web2-konttien katto per host |
+| `WEB2_MIN_FREE_MB` | 1024 | vaadittu vapaa muisti Docker-VM:ssä ennen uutta selainta; 0 poistaa tarkistuksen |
 | `WEB2_CMD_TIMEOUT` | 60 | s, per-komento |
 | `WEB2_IMAGE` | `web2:latest` | image-nimi |
 | `WEB2_DEBUG` | - | timestamp-lokit stderr:iin (välitetään konttiin `WEB_DEBUG`:na) |
@@ -527,7 +529,8 @@ web2/
     main.go          # arg-parsinta, komentodispatch, usage (ei session-haaraa)
     identity.go      # ResolveOwner + ProcTree-tuotantototeutus (ps-pohjainen)
     identity_test.go # taulukkotestit mock-ProcTreellä (Osa 8.1)
-    lifecycle.go     # ensureContainer, readiness, sessiokatto, portit, dev-mode
+    lifecycle.go     # ensureContainer, readiness, portit, dev-mode
+    capacity.go      # riittääkö Docker-VM:n muisti uudelle selaimelle
     exec.go          # komennon polku: reaper → ensure → docker exec (+ timeout, WEB_NO_LOCK)
     reaper.go        # Osa 4.4 kohta 3
     admin.go         # admin-komennot + agent-gate
@@ -658,7 +661,7 @@ Muutokset:
 | T7 | Agent-gate | `CLAUDECODE=1 web2 admin list` → E8/exit 3; `CLAUDECODE=1 WEB2_ADMIN=1 ...` → ok |
 | T8 | Admin destroy | `--mine` poistaa vain oman ID:n kontit; hash-argumentti täsmälleen yhden |
 | T9 | Output-kontrakti | grounding-rivi stderr:issä, stdout puhdas; `--json`-skeema validoituu; exit-koodit E1/E2/E9 |
-| T10 | Sessiokatto | `WEB2_MAX_SESSIONS=1` + toinen ID → E7, eikä ensimmäisen kontti kuole |
+| T10 | Kapasiteetti | `WEB2_MIN_FREE_MB` mahdottoman suureksi → E7, konttia ei luoda, eikä olemassa oleva kuole |
 | T11 | status/reset | `web2 status` ilman konttia ei käynnistä sitä; `reset` → cookiet poissa |
 
 Budjetit v1:stä: `npm test` < 3 s; nopea e2e < 10 s; Docker-elinkaaritestit
@@ -683,7 +686,7 @@ Budjetit v1:stä: `npm test` < 3 s; nopea e2e < 10 s; Docker-elinkaaritestit
 | K1 | Subagentit jakavat emon selaimen? | ~~Kyllä (todennettu, haluttu)~~ **Kumottu 2026-08-09.** Käytännössä ne törmäilivät: lukko esti racen mutta ei sitä että subagentti navigoi pois toisen sivulta. CC 2.1.226 antaa subagentti-tason ID:n hook-payloadissa (Osa 2.1), joten se lisättiin ketjun kohdaksi 2 (`WEB2_AGENT`). Jokainen subagentti saa nyt oman selaimensa; ilman hookia degradoituu vanhaan jaettuun (ei koskaan toisen omistajan) selaimeen. |
 | K2 | Muut harnessit? | Ancestor-walk + term + tty kattaa; env-taulu laajennettavissa rivillä. |
 | K3 | `CLAUDE_CODE_SESSION_ID` ei-dokumentoitu - jos katoaa? | Ketju degradoituu kohtaan 4 (proc) joka toimii CC:lle myös (claude-prosessi on aina ancestor). Ei kova riippuvuus. |
-| K4 | Monta Chromiumia = raskas | Kovat rajat: 2 GB/2 CPU per kontti, katto 8, idle 5 min, TTL 4 h. Ei auto-evictiä koskaan. |
+| K4 | Monta Chromiumia = raskas | Kovat rajat: 2 GB/2 CPU per kontti, idle 5 min, TTL 4 h. Ei auto-evictiä koskaan. **Kiinteä lukumääräkatto (`WEB2_MAX_SESSIONS`, oletus 8) poistettu 2026-08-09**: se laski vain web2:n omia kontteja, kun niukka resurssi on Docker-VM:n muisti jonka kaikki kontit jakavat. Mitattu kehityskoneella: 47 muuta konttia varasi 5,7 GB VM:n 7,7 GB:stä eli tilaa oli neljälle selaimelle, ja katto olisi päästänyt kahdeksan. Nyt jokainen luonti kysyy VM:n vapaan muistin. |
 | K5 | Sama agentti eri hakemistoissa | Identiteetti on sessio-, ei cwd-pohjainen: yksi Claude = yksi selain. Tietoinen valinta (P0). |
 | K6 | v1:n `session save/load` (cookiet+storage tiedostoon) | Jätetään M8:n jälkeiseksi; jos toteutetaan, nimi on `web2 state save/load` (ei "session"). |
 | K7 | `web ai` (sisäkkäinen Claude) | Ei web2:n ytimeen; agentti on jo se AI. Voidaan lisätä myöhemmin ihmispintaan. |

@@ -76,7 +76,8 @@ patches and the "I still don't care about cookies" extension), Xvfb, always-on
 VNC/noVNC, and a rolling 5-minute dashcam recording for post-mortems. The
 host binary is a thin Go orchestrator: it resolves the caller's identity,
 lazily ensures the container, serializes concurrent commands with a lock, and
-enforces timeouts, resource limits and a host-wide browser cap.
+enforces timeouts, resource limits, and refuses to start a browser the
+Docker VM has no memory left for.
 
 Design document: [web2.md](./web2.md). Contributor guide: [CLAUDE.md](./CLAUDE.md).
 

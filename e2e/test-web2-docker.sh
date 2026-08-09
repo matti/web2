@@ -100,11 +100,14 @@ echo "$gateOut" | grep -q "human-only" && ok "T7 gate message" || bad "T7 messag
 env "${BASE_ENV[@]}" CLAUDECODE=1 WEB2_ADMIN=1 "$BIN" admin list >/dev/null 2>&1 \
   && ok "T7 WEB2_ADMIN=1 authorizes" || bad "T7 WEB2_ADMIN=1 blocked"
 
-# --- T10: session cap refuses new browsers but never evicts existing ones
-capOut=$(env "${BASE_ENV[@]}" WEB2_MAX_SESSIONS=1 CLAUDE_CODE_SESSION_ID=web2-e2e-E "$BIN" exec "1" 2>&1)
+# --- T10: capacity is decided by free memory in the Docker VM, not by a count
+# of web2's own containers - the VM's memory is shared with every other
+# container on the machine. An impossible threshold stands in for a full VM.
+capOut=$(env "${BASE_ENV[@]}" WEB2_MIN_FREE_MB=99999999 CLAUDE_CODE_SESSION_ID=web2-e2e-E "$BIN" exec "1" 2>&1)
 capCode=$?
-[ "$capCode" = "3" ] && ok "T10 cap refused (exit 3)" || bad "T10 exit=$capCode: $capOut"
-echo "$capOut" | grep -q "too many browsers" && ok "T10 cap message" || bad "T10 message: $capOut"
+[ "$capCode" = "3" ] && ok "T10 capacity refused (exit 3)" || bad "T10 exit=$capCode: $capOut"
+echo "$capOut" | grep -q "not enough memory" && ok "T10 capacity message" || bad "T10 message: $capOut"
+[ -z "$(ctr_of web2-e2e-E)" ] && ok "T10 refused browser was not created" || bad "T10 E was created anyway"
 [ -n "$(ctr_of web2-e2e-A)" ] && ok "T10 existing browser not evicted" || bad "T10 A was evicted"
 
 # --- T6: lock - parallel command gets busy error (exit 5) once the wait runs
