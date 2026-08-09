@@ -174,8 +174,11 @@ const PAGES: Record<string, () => string> = {
   </select>
   <button type="submit" id="submit-btn">Submit</button>
   <button type="button" id="click-btn" onclick="document.getElementById('result').textContent='clicked'">Click Me</button>
-  <button type="button" id="double-btn" ondblclick="document.getElementById('result').textContent='double-clicked'">Double Click Me</button>
-  <div id="context-target" oncontextmenu="event.preventDefault(); document.getElementById('result').textContent='right-clicked'">Right Click Me</div>
+  <!-- Labels here must not contain each other as substrings: click --text
+       matches by substring, so a "Double Click Me" would make --text "Click Me"
+       ambiguous and fail with a strict-mode violation. -->
+  <button type="button" id="double-btn" ondblclick="document.getElementById('result').textContent='double-clicked'">Double Tap</button>
+  <div id="context-target" oncontextmenu="event.preventDefault(); document.getElementById('result').textContent='right-clicked'">Context Target</div>
   <div id="result"></div>
 </form>
 </body></html>`,
