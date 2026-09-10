@@ -40,7 +40,11 @@ supports machine-readable output where it matters.
 
 **1. Build the binary and put it on your PATH:**
 
+Building from source requires Go as well as Docker.
+
 ```bash
+git clone https://github.com/matti/web2.git
+cd web2
 cd cmd/web2 && go build -o web2 .
 ln -s "$(pwd)/web2" /usr/local/bin/web2   # or any directory on your PATH
 web2 doctor                               # checks Docker; image builds on first use
@@ -50,14 +54,14 @@ web2 doctor                               # checks Docker; image builds on first
 session:
 
 ```
-/plugin marketplace add /path/to/web2
+/plugin marketplace add matti/web2
 /plugin install web2@web2-marketplace
 ```
 
 That's it. The skills are now available in every session as `/web2:go`,
 `/web2:read`, `/web2:crawl` and `/web2:screenshot`, and agents can use the
-`web2` CLI directly. Updates flow straight from the directory - no
-reinstall needed.
+`web2` CLI directly. For local plugin development, use
+`/plugin marketplace add /path/to/web2` instead.
 
 The plugin also installs a `PreToolUse` hook (`hooks/hooks.json`) that gives
 every **subagent** its own browser instead of letting them all share the

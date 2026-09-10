@@ -4,6 +4,13 @@ dist/
 *.log
 *.tmp
 
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
 # Build outputs (cmd/web2/_bundle.tar.gz IS tracked: go:embed needs it,
 # and maybeRebuild regenerates it on source changes in dev)
 cmd/web2/web2
