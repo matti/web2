@@ -7,6 +7,11 @@ src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 settings="$cfg/settings.json"
 
+bindir="${WEB2_BINDIR:-$HOME/.local/bin}"
+mkdir -p "$bindir"
+ln -sfn "$src/cmd/web2/web2" "$bindir/web2"
+echo "binary: $bindir/web2"
+
 mkdir -p "$cfg/skills"
 for dir in "$src"/skills/*/; do
   name="web2-$(basename "$dir")"
@@ -26,4 +31,4 @@ else
   echo "hook: added to $settings"
 fi
 
-command -v web2 >/dev/null || echo "warning: web2 binary not on PATH - see README install step 1"
+command -v web2 >/dev/null || echo "warning: $bindir is not on PATH - add it to your shell profile"
