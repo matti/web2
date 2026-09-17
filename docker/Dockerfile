@@ -4,7 +4,7 @@
 # package-lock.json. When they drift, `playwright install` below deletes the
 # browsers this image ships and downloads ~180 MB of replacements on every
 # build. TestBaseImageMatchesLockedPlaywright guards the pairing.
-FROM mcr.microsoft.com/playwright:v1.58.0-noble AS base
+FROM mcr.microsoft.com/playwright:v1.63.0-noble AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb x11vnc novnc python3-websockify unzip scrot openbox ffmpeg \
