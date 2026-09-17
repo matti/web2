@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
-    "commander": "^13.1.0",
-    "linkedom": "^0.18.12",
-    "playwright": "^1.52.0",
-    "tsx": "^4.19.0"
+    "commander": "^15.0.0",
+    "linkedom": "^0.18.13",
+    "playwright": "^1.63.0",
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.20.3",
     "typescript": "^5.8.0"
   }
 }
