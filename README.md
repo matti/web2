@@ -68,10 +68,12 @@ every **subagent** its own browser instead of letting them all share the
 parent's. Nothing to configure: it only touches Bash commands that run `web2`,
 and it leaves the main session alone.
 
-Alternative without the plugin system: copy `skills/*` into
-`~/.claude/skills/` (skills appear without the `web2:` prefix) and, if you use
-subagents, copy the `hooks` block from `hooks/hooks.json` into your
-`settings.json` - otherwise subagents fall back to sharing one browser.
+Alternative without the plugin system: run `./bin/install.sh` (or
+`just install`, which builds the binary first). It symlinks `skills/*` into
+`$CLAUDE_CONFIG_DIR/skills/` (default `~/.claude`, skills appear as `web2-go`
+and so on) and adds the `hooks` block from `hooks/hooks.json` to your
+`settings.json`. Run it again to refresh - it changes nothing twice. Without
+the hook, subagents fall back to sharing one browser.
 
 ## Inside the box
 
